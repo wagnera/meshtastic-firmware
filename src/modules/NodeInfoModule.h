@@ -22,6 +22,8 @@ class NodeInfoModule : public ProtobufModule<meshtastic_User>, private concurren
      */
     void sendOurNodeInfo(NodeNum dest = NODENUM_BROADCAST, bool wantReplies = false, uint8_t channel = 0);
 
+    void sendTempNodeInfoToPhone(const meshtastic_NodeInfoLite *node);
+
   protected:
     /** Called to handle a particular incoming message
 

@@ -94,3 +94,21 @@ int32_t NodeInfoModule::runOnce()
 
     return getConfiguredOrDefaultMs(config.device.node_info_broadcast_secs, default_broadcast_interval_secs);
 }
+
+void NodeInfoModule::sendTempNodeInfoToPhone(const meshtastic_NodeInfoLite *node)
+{
+    LOG_DEBUG("Sending node info to phone\n");
+    meshtastic_User user = node->user;
+    user.hw_model = meshtastic_HardwareModel_UNSET;
+    snprintf(user.long_name, sizeof(user.long_name), "Meshtastic %04x", node->num & 0xFFFF);
+    snprintf(user.short_name, sizeof(user.short_name), "%04x", node->num & 0xFFFF);
+    snprintf(user.id, sizeof(user.id), "!%08x", node->num);
+    meshtastic_MeshPacket *p = allocDataProtobuf(node->user);
+    if (p) {
+        p->from = node->num;
+        p->decoded.want_response = false;
+        p->priority = meshtastic_MeshPacket_Priority_BACKGROUND;
+
+        service.sendToPhone(p);
+    }
+}

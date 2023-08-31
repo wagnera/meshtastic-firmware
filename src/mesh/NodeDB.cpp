@@ -16,6 +16,7 @@
 #include "main.h"
 #include "mesh-pb-constants.h"
 #include "modules/NeighborInfoModule.h"
+#include "modules/NodeInfoModule.h"
 #include <ErriezCRC32.h>
 #include <pb_decode.h>
 #include <pb_encode.h>
@@ -818,6 +819,10 @@ meshtastic_NodeInfoLite *NodeDB::getOrCreateMeshNode(NodeNum n)
         // everything is missing except the nodenum
         memset(lite, 0, sizeof(*lite));
         lite->num = n;
+        // Send placeholder NodeInfo to phone
+        if (nodeInfoModule) {
+            nodeInfoModule->sendTempNodeInfoToPhone(lite);
+        }
     }
 
     return lite;
