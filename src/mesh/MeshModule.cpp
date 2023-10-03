@@ -82,7 +82,7 @@ void MeshModule::callPlugins(const meshtastic_MeshPacket &mp, RxSource src)
     // Was this message directed to us specifically?  Will be false if we are sniffing someone elses packets
     auto ourNodeNum = nodeDB.getNodeNum();
     bool toUs = mp.to == NODENUM_BROADCAST || mp.to == ourNodeNum;
-
+    LOG_DEBUG("Number of modules: %lu\n",modules->size());
     for (auto i = modules->begin(); i != modules->end(); ++i) {
         auto &pi = **i;
 
@@ -155,6 +155,10 @@ void MeshModule::callPlugins(const meshtastic_MeshPacket &mp, RxSource src)
                     break;
                 }
             }
+        }
+        else
+        {
+            LOG_DEBUG("Module '%s' DOES NOT wantsPacket=%d\n", pi.name, wantsPacket);
         }
 
         pi.currentRequest = NULL;

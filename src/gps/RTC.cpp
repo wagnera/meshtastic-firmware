@@ -101,8 +101,10 @@ bool perhapsSetRTC(RTCQuality q, const struct timeval *tv)
     static uint32_t lastSetMsec = 0;
     uint32_t now = millis();
 
+    LOG_DEBUG("Perhaps set time to RTC %ld secs\n", tv->tv_sec);
+
     bool shouldSet;
-    if (q > currentQuality) {
+    if (q >= currentQuality) {
         currentQuality = q;
         shouldSet = true;
         LOG_DEBUG("Upgrading time to RTC %ld secs (quality %d)\n", tv->tv_sec, q);
@@ -181,9 +183,9 @@ bool perhapsSetRTC(RTCQuality q, struct tm &t)
     tv.tv_sec = res;
     tv.tv_usec = 0; // time.centisecond() * (10 / 1000);
 
-    // LOG_DEBUG("Got time from GPS month=%d, year=%d, unixtime=%ld\n", t.tm_mon, t.tm_year, tv.tv_sec);
+    LOG_DEBUG("Got time from GPS month=%d, year=%d, unixtime=%ld\n", t.tm_mon, t.tm_year, tv.tv_sec);
     if (t.tm_year < 0 || t.tm_year >= 300) {
-        // LOG_DEBUG("Ignoring invalid GPS month=%d, year=%d, unixtime=%ld\n", t.tm_mon, t.tm_year, tv.tv_sec);
+        LOG_DEBUG("Ignoring invalid GPS month=%d, year=%d, unixtime=%ld\n", t.tm_mon, t.tm_year, tv.tv_sec);
         return false;
     } else {
         return perhapsSetRTC(q, &tv);

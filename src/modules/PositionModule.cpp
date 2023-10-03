@@ -44,6 +44,8 @@ bool PositionModule::handleReceivedProtobuf(const meshtastic_MeshPacket &mp, mes
         struct timeval tv;
         uint32_t secs = p.time;
 
+        LOG_DEBUG("Time is %ld", secs);
+
         tv.tv_sec = secs;
         tv.tv_usec = 0;
 

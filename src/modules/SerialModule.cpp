@@ -70,6 +70,7 @@ size_t serialPayloadSize;
 
 SerialModuleRadio::SerialModuleRadio() : MeshModule("SerialModuleRadio")
 {
+    LOG_INFO("Serial Mode: %i\n", moduleConfig.serial.mode);
     switch (moduleConfig.serial.mode) {
     case meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG:
         ourPortNum = meshtastic_PortNum_TEXT_MESSAGE_APP;
@@ -106,12 +107,13 @@ int32_t SerialModule::runOnce()
         without having to configure it from the PythonAPI or WebUI.
     */
 
-    // moduleConfig.serial.enabled = true;
-    // moduleConfig.serial.rxd = 35;
-    // moduleConfig.serial.txd = 15;
-    // moduleConfig.serial.override_console_serial_port = true;
-    // moduleConfig.serial.mode = meshtastic_ModuleConfig_SerialConfig_Serial_Mode_CALTOPO;
-    // moduleConfig.serial.timeout = 1000;
+    moduleConfig.serial.enabled = true;
+    moduleConfig.serial.rxd = 19;
+    moduleConfig.serial.txd = 20;
+    moduleConfig.serial.override_console_serial_port = false;
+    moduleConfig.serial.mode = meshtastic_ModuleConfig_SerialConfig_Serial_Mode_SIMPLE;
+    moduleConfig.serial.timeout = 100;
+    moduleConfig.serial.baud = meshtastic_ModuleConfig_SerialConfig_Serial_Baud_BAUD_38400;
     // moduleConfig.serial.echo = 1;
 
     if (!moduleConfig.serial.enabled)
@@ -155,6 +157,7 @@ int32_t SerialModule::runOnce()
             serialModuleRadio = new SerialModuleRadio();
 
             firstTime = 0;
+            LOG_INFO("Sucessfully configured serial peripheral interface\n");
 
             // in API mode send rebooted sequence
             if (moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_PROTO) {
@@ -186,6 +189,7 @@ int32_t SerialModule::runOnce()
             else {
                 while (Serial2.available()) {
                     serialPayloadSize = Serial2.readBytes(serialBytes, meshtastic_Constants_DATA_PAYLOAD_LEN);
+                    LOG_DEBUG("Read serial data: packet size: %lu\n",serialPayloadSize);
                     serialModuleRadio->sendPayload();
                 }
             }
@@ -248,8 +252,8 @@ ProcessMessage SerialModuleRadio::handleReceived(const meshtastic_MeshPacket &mp
         }
 
         auto &p = mp.decoded;
-        // LOG_DEBUG("Received text msg self=0x%0x, from=0x%0x, to=0x%0x, id=%d, msg=%.*s\n",
-        //          nodeDB.getNodeNum(), mp.from, mp.to, mp.id, p.payload.size, p.payload.bytes);
+        LOG_INFO("Received text msg self=0x%0x, from=0x%0x, to=0x%0x, id=%d, msg=%.*s\n",
+                 nodeDB.getNodeNum(), mp.from, mp.to, mp.id, p.payload.size, p.payload.bytes);
 
         if (getFrom(&mp) == nodeDB.getNodeNum()) {
 
@@ -273,6 +277,8 @@ ProcessMessage SerialModuleRadio::handleReceived(const meshtastic_MeshPacket &mp
             if (moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_DEFAULT ||
                 moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_SIMPLE) {
                 serialPrint->write(p.payload.bytes, p.payload.size);
+                // Serial2.write(p.payload.bytes, p.payload.size);
+                LOG_DEBUG("Wrote to serial port\n");
             } else if (moduleConfig.serial.mode == meshtastic_ModuleConfig_SerialConfig_Serial_Mode_TEXTMSG) {
                 meshtastic_NodeInfoLite *node = nodeDB.getMeshNode(getFrom(&mp));
                 String sender = (node && node->has_user) ? node->user.short_name : "???";
