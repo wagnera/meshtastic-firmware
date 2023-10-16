@@ -87,7 +87,15 @@ meshtastic_MeshPacket *PositionModule::allocReply()
     // lat/lon are unconditionally included - IF AVAILABLE!
     p.latitude_i = localPosition.latitude_i;
     p.longitude_i = localPosition.longitude_i;
-    p.time = localPosition.time;
+    uint32_t current_unix_time = getValidTime(RTCQualityGPS);
+    if (current_unix_time != 0) {
+        LOG_DEBUG("using RTC to set time\n");
+        p.time = current_unix_time;
+    }
+    else {
+        LOG_DEBUG("localPosition.time to set time\n");
+        p.time = localPosition.time;
+    }
 
     if (pos_flags & meshtastic_Config_PositionConfig_PositionFlags_ALTITUDE) {
         if (pos_flags & meshtastic_Config_PositionConfig_PositionFlags_ALTITUDE_MSL)

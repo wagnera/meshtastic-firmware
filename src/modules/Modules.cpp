@@ -18,6 +18,7 @@
 #include "modules/TraceRouteModule.h"
 #include "modules/WaypointModule.h"
 #include "modules/LedMatrixModule.h"
+#include "modules/KeypadModule.h"
 #if HAS_TELEMETRY
 #include "modules/Telemetry/DeviceTelemetry.h"
 #endif
@@ -54,6 +55,7 @@ void setupModules()
         neighborInfoModule = new NeighborInfoModule();
         detectionSensorModule = new DetectionSensorModule();
         new LedMatrixModule();
+        // new KeypadModule(); 
 
         // Note: if the rest of meshtastic doesn't need to explicitly use your module, you do not need to assign the instance
         // to a global variable.

@@ -228,6 +228,7 @@ void NodeDB::installDefaultModuleConfig()
     moduleConfig.has_store_forward = true;
     moduleConfig.has_telemetry = true;
     moduleConfig.has_external_notification = true;
+    moduleConfig.has_led_matrix = true;
 #if defined(RAK4630) || defined(RAK11310)
     // Default to RAK led pin 2 (blue)
     moduleConfig.external_notification.enabled = true;
@@ -242,6 +243,8 @@ void NodeDB::installDefaultModuleConfig()
     moduleConfig.external_notification.enabled = true;
 #endif
     moduleConfig.has_canned_message = true;
+
+    moduleConfig.led_matrix.enabled = true;
 
     strncpy(moduleConfig.mqtt.address, default_mqtt_address, sizeof(moduleConfig.mqtt.address));
     strncpy(moduleConfig.mqtt.username, default_mqtt_username, sizeof(moduleConfig.mqtt.username));

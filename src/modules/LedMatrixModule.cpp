@@ -18,11 +18,14 @@
 #include "NodeDB.h"
 #include "RTC.h"
 #include "Router.h"
+#include "mesh/generated/meshtastic/remote_hardware.pb.h"
 #include "configuration.h"
 #include <Arduino.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_NeoMatrix.h>
 #include <Adafruit_NeoPixel.h>
+
+#include "soccer_animation.h"
 
 #include "main.h"
 
@@ -52,9 +55,10 @@ uint16_t current_color;
 int scroll_x;
 
 char text_trigger = 'L';
+int max_index = 8; //update this when adding new text
 
-static const char* const text_messages[] = {"This is a test", "Lunch Time!!", "Foos o'clock!", "Zito's Time!", "Thai Tuesday Time!", "Thai Thursday Time!"};
-static const int text_sizes[] = {sizeof("This is a test"),sizeof("Lunch Time!!"), sizeof("Foos o'clock!"), sizeof("Zito's Time!"), sizeof("Thai Tuesday!"), sizeof("Thai Thursday!")};
+static const char* const text_messages[] = {"This is a test", "Lunch Time!!", "Foos o'clock!", "Zito's Time!", "Thai Tuesday!", "Thai Thursday!", "Soccer Time", "Running Time", "Taco Tuesday!"};
+static const int text_sizes[] = {sizeof("This is a test"),sizeof("Lunch Time!!"), sizeof("Foos o'clock!"), sizeof("Zito's Time!"), sizeof("Thai Tuesday!"), sizeof("Thai Thursday!"), sizeof("Soccer Time"), sizeof("Running Time"), sizeof("Taco Tuesday!")};
 
 // Function to convert Unix time to Central Time (CT) with DST adjustments
 tm unixTimeToCT(long long unixTime) {
@@ -132,18 +136,19 @@ void displayTime()
     {
         tm ctTimeInfo = unixTimeToCT(current_unix_time);
 
-        matrix.setTextColor(current_color);
+        matrix.setTextColor(matrix.Color(138, 43, 226));
         matrix.fillScreen(0);
         matrix.setCursor(1, 1);
         char time_buf [6];
         snprintf(time_buf, 6, "%02i:%02i", ctTimeInfo.tm_hour,ctTimeInfo.tm_min);
+        // snprintf(time_buf, 6, "10:31");
         // LOG_DEBUG("Time string: %s\n",time_buf);
-        matrix.print(F(time_buf));
+        matrix.print(time_buf);
         // matrix.print(F("10:31"));
     }
     else
     {
-        matrix.setTextColor(matrix.Color(255, 0, 255));
+        matrix.setTextColor(matrix.Color(138, 43, 226));
         matrix.fillScreen(0);
         matrix.setCursor(11, 1);
         matrix.print(F(".."));
@@ -153,6 +158,49 @@ void displayTime()
 
     matrix.show();
 }
+
+// void draw_image_from_array(uint16_t height, uint16_t width, uint16_t x, uint16_t y, const unsigned char* array)
+// {
+//   matrix.fillScreen(0);
+//   for (int i =0; i < height; i++)
+//   {
+//     for (int j=0;j<width;j++)
+//     {
+//       matrix.drawPixel(x+j,y+i,matrix.Color((uint8_t)(array[j+i*width]),(uint8_t)(array[j+i*width+(height*width)]),(uint8_t)(array[j+i*width+(height*width*2)])));
+//     }
+//   }
+
+//   matrix.show();
+// }
+
+// void foosball_animation()
+// {
+//   int index = -8;
+//   for (auto bmp_img: test_gif_frame_rgb_Array)
+//   {
+//     // matrix.fillScreen(0);
+//     // matrix.drawBitmap(index, 0, bmp_img, 8,8,  matrix.Color(255, 0, 255));
+//     // matrix.show();
+//     draw_image_from_array(8,8,index,0,bmp_img);
+//     delay(70);
+//     index++;
+//   }
+//   for (auto bmp_img: test_gif_frame_rgb_Array)
+//   {
+//     // matrix.fillScreen(0);
+//     // matrix.drawBitmap(index, 0, bmp_img, 8,8,  matrix.Color(255, 0, 255));
+//     // matrix.show();
+//     draw_image_from_array(8,8,index,0,bmp_img);
+//     delay(70);
+//     index++;
+//     if (index > 40)
+//     {
+//       break;
+//     }
+    
+//   }
+
+// }
 
 int32_t LedMatrixModule::runOnce()
 {
@@ -177,14 +225,15 @@ int32_t LedMatrixModule::runOnce()
     {
         displayTime();
     }
-    return 100;
+    return 80;
 }
 
 bool LedMatrixModule::wantPacket(const meshtastic_MeshPacket *p)
 {
     LOG_DEBUG("led want packet port: %i\n",p->decoded.portnum);
     // return 1;
-    return MeshService::isTextPayload(p);
+    // return MeshService::isTextPayload(p);
+    return (p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP || p->decoded.portnum == meshtastic_PortNum_REMOTE_HARDWARE_APP);
 }
 
 LedMatrixModule::LedMatrixModule()
@@ -196,19 +245,7 @@ LedMatrixModule::LedMatrixModule()
         without having to configure it from the PythonAPI or WebUI.
     */
 
-    // moduleConfig.external_notification.alert_message = true;
-    // moduleConfig.external_notification.alert_message_buzzer = true;
-    // moduleConfig.external_notification.alert_message_vibra = true;
-
-    // moduleConfig.external_notification.active = true;
-    // moduleConfig.external_notification.alert_bell = 1;
-    // moduleConfig.external_notification.output_ms = 1000;
-    // moduleConfig.external_notification.output = 4; // RAK4631 IO4
-    // moduleConfig.external_notification.output_buzzer = 10; // RAK4631 IO6
-    // moduleConfig.external_notification.output_vibra = 28; // RAK4631 IO7
-    // moduleConfig.external_notification.nag_timeout = 300;
-
-    if (moduleConfig.external_notification.enabled) {
+    if (moduleConfig.led_matrix.enabled) {
         
     } else {
         LOG_INFO("External Notification Module Disabled\n");
@@ -218,8 +255,8 @@ LedMatrixModule::LedMatrixModule()
 
 ProcessMessage LedMatrixModule::handleReceived(const meshtastic_MeshPacket &mp)
 {
-    if (moduleConfig.external_notification.enabled) {
-        LOG_INFO("Inside led matrix module");
+    if (moduleConfig.led_matrix.enabled) {
+        LOG_INFO("Inside led matrix module\n");
         auto &p = mp.decoded;
         // scrollText("Lunch Time", sizeof("Lunch Time"), matrix.Color(0, 0, 255));
         // current_animation = true;
@@ -230,20 +267,52 @@ ProcessMessage LedMatrixModule::handleReceived(const meshtastic_MeshPacket &mp)
         // current_text_length = p.payload.size;
         // current_color = matrix.Color(0, 0, 255);
         // LOG_DEBUG("Led matrix decoded msg: msg=%.*s\n", mp.decoded.payload.bytes);
-        LOG_INFO("Led matrix decoded msg from=0x%0x, id=0x%x, msg=%.*s\n", mp.from, mp.id, p.payload.size, p.payload.bytes);
-        LOG_DEBUG("Matrix looking for %i got %i\n",text_trigger,p.payload.bytes[0]);
-        if (p.payload.bytes[0] == text_trigger)
-        {
+
+        if (p.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP) {
+            LOG_DEBUG("Got message request from text app\n");
+            LOG_INFO("Led matrix decoded msg from=0x%0x, id=0x%x, msg=%.*s\n", mp.from, mp.id, p.payload.size, p.payload.bytes);
+            LOG_DEBUG("Matrix looking for %i got %i\n",text_trigger,p.payload.bytes[0]);
+            if (p.payload.bytes[0] == text_trigger)
+            {
+                LOG_DEBUG("Got request for text message\n");
+                int msg_index = p.payload.bytes[1] - 48; // 48 = 0 in ascii
+                if (msg_index > max_index && msg_index >= 0)
+                {
+                    LOG_DEBUG("Requested message index out of range, idx: %i\n", msg_index);
+                    return ProcessMessage::CONTINUE;
+                }
+                current_text = text_messages[msg_index];
+                current_text_length = text_sizes[msg_index];
+                current_color = matrix.Color(255, 0, 255);
+                current_animation = true;
+            }
+            else
+            {
+                LOG_DEBUG("NOT Lunchtime\n");
+            }
+        }
+        else if (p.portnum == meshtastic_PortNum_REMOTE_HARDWARE_APP) {
+            meshtastic_HardwareMessage hw_message;
+            if (pb_decode_from_bytes(p.payload.bytes, p.payload.size, meshtastic_HardwareMessage_fields, &hw_message)) {
+            LOG_DEBUG("Sucessfully decoded message\n");
+            } else {
+                LOG_ERROR("Error decoding remote button message!\n");
+                return ProcessMessage::CONTINUE;
+            }
+
+            LOG_DEBUG("Got message request from physical button\n");
+            LOG_DEBUG("got %i\n",(uint8_t)hw_message.gpio_value);
             LOG_DEBUG("Got request for text message\n");
-            int msg_index = p.payload.bytes[1] - 97;
+            int msg_index = (uint8_t)hw_message.gpio_value - 48; // 48 = 0 in ascii
+            if (msg_index > max_index || msg_index <= 0)
+            {
+                LOG_DEBUG("Requested message index out of range, idx: %i\n", msg_index);
+                return ProcessMessage::CONTINUE;
+            }
             current_text = text_messages[msg_index];
             current_text_length = text_sizes[msg_index];
             current_color = matrix.Color(255, 0, 255);
             current_animation = true;
-        }
-        else
-        {
-            LOG_DEBUG("NOT Lunchtime\n");
         }
     } else {
         LOG_INFO("LED Matrix Module Disabled\n");

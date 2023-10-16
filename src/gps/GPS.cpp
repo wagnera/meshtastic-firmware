@@ -607,7 +607,7 @@ int32_t GPS::runOnce()
         }
 
         // If we've already set time from the GPS, no need to ask the GPS
-        bool gotTime = (getRTCQuality() >= RTCQualityGPS);
+        bool gotTime = false;//(getRTCQuality() >= RTCQualityGPS);
         if (!gotTime && lookForTime()) { // Note: we count on this && short-circuiting and not resetting the RTC time
             gotTime = true;
             shouldPublish = true;
