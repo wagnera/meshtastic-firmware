@@ -53,6 +53,7 @@ const char *current_text;
 size_t current_text_length;
 uint16_t current_color;
 int scroll_x;
+int repeat_text = 0;
 
 char text_trigger = 'L';
 int max_index = 8; //update this when adding new text
@@ -121,7 +122,14 @@ void scrollText()
 
         if(--scroll_x < -text_pixel_width) {
             scroll_done = true;
-            current_animation = false;
+            if (repeat_text <= 0){
+                current_animation = false;
+            }
+            else {
+                repeat_text--;
+                scroll_x = matrix.width();
+            }
+            
         }
         matrix.show();
         // delay(70);
@@ -285,6 +293,7 @@ ProcessMessage LedMatrixModule::handleReceived(const meshtastic_MeshPacket &mp)
                 current_text_length = text_sizes[msg_index];
                 current_color = matrix.Color(255, 0, 255);
                 current_animation = true;
+                repeat_text = 3;
             }
             else
             {
@@ -304,7 +313,7 @@ ProcessMessage LedMatrixModule::handleReceived(const meshtastic_MeshPacket &mp)
             LOG_DEBUG("got %i\n",(uint8_t)hw_message.gpio_value);
             LOG_DEBUG("Got request for text message\n");
             int msg_index = (uint8_t)hw_message.gpio_value - 48; // 48 = 0 in ascii
-            if (msg_index > max_index || msg_index <= 0)
+            if (msg_index > max_index || msg_index < 0)
             {
                 LOG_DEBUG("Requested message index out of range, idx: %i\n", msg_index);
                 return ProcessMessage::CONTINUE;
@@ -313,6 +322,7 @@ ProcessMessage LedMatrixModule::handleReceived(const meshtastic_MeshPacket &mp)
             current_text_length = text_sizes[msg_index];
             current_color = matrix.Color(255, 0, 255);
             current_animation = true;
+            repeat_text = 3;
         }
     } else {
         LOG_INFO("LED Matrix Module Disabled\n");
