@@ -33,7 +33,9 @@ byte colPins [COLS] = {4, 5, 6, 7}; // Connect to Pin column of keypad.
 // COLS: Set the number of Columns
 // I2CADDR: Set the Address for i2C
 // PCF8574: Set the number IC
+#ifdef I2C_SDA1
 Keypad_I2C keypad (makeKeymap(keys), rowPins, colPins, ROWS, COLS, I2CADDR, PCF8574, &Wire1);
+
 
 bool keypad_setup = false;
 
@@ -89,3 +91,4 @@ int32_t KeypadModule::runOnce()
 
     return 50; // Poll our GPIOs every 200ms (FIXME, make adjustable via protobuf arg)
 }
+#endif
