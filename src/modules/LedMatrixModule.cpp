@@ -56,10 +56,12 @@ int scroll_x;
 int repeat_text = 0;
 
 char text_trigger = 'L';
-int max_index = 8; //update this when adding new text
+int max_index = 9; //update this when adding new text
 
-static const char* const text_messages[] = {"This is a test", "Lunch Time!!", "Foos o'clock!", "Zito's Time!", "Thai Tuesday!", "Thai Thursday!", "Soccer Time", "Running Time", "Taco Tuesday!"};
-static const int text_sizes[] = {sizeof("This is a test"),sizeof("Lunch Time!!"), sizeof("Foos o'clock!"), sizeof("Zito's Time!"), sizeof("Thai Tuesday!"), sizeof("Thai Thursday!"), sizeof("Soccer Time"), sizeof("Running Time"), sizeof("Taco Tuesday!")};
+static const char* const text_messages[] = {"This is a test", "Lunch Time!!", "Foos o'clock!", "Zito's Time!", "Thai Tuesday!",
+                                            "Thai Thursday!", "Soccer Time", "Running Time", "Taco Tuesday!", "Moo goo Monday!"};
+static const int text_sizes[] = {sizeof("This is a test"),sizeof("Lunch Time!!"), sizeof("Foos o'clock!"), sizeof("Zito's Time!"), sizeof("Thai Tuesday!"),
+                                 sizeof("Thai Thursday!"), sizeof("Soccer Time"), sizeof("Running Time"), sizeof("Taco Tuesday!"), sizeof("Moo goo Monday!")};
 
 // Function to convert Unix time to Central Time (CT) with DST adjustments
 tm unixTimeToCT(long long unixTime) {
@@ -72,16 +74,16 @@ tm unixTimeToCT(long long unixTime) {
 
     // Hard-coded DST transition times for the next 10 years (assuming DST starts on March 14 and ends on November 7)
     int dstTransitions[] = {
-        1678846800, // March 14, 2023 - DST starts
-        1700000000, // November 7, 2023 - DST ends
-        1731166800, // March 12, 2024 - DST starts
-        1752326000, // November 3, 2024 - DST ends
-        1783492800, // March 11, 2025 - DST starts
-        1804652000, // November 2, 2025 - DST ends
-        1835818800, // March 10, 2026 - DST starts
-        1856978000, // November 1, 2026 - DST ends
-        1888144800, // March 9, 2027 - DST starts
-        1909304000, // November 7, 2027 - DST ends
+        1678608000, // March 12, 2023 - DST starts
+        1699171200, // November 5, 2023 - DST ends
+        1710057600, // March 10, 2024 - DST starts
+        1730620800, // November 3, 2024 - DST ends
+        1741507200, // March 9, 2025 - DST starts
+        1762070400, // November 2, 2025 - DST ends
+        1772956800, // March 8, 2026 - DST starts
+        1793520000, // November 1, 2026 - DST ends
+        1805011200, // March 14, 2027 - DST starts
+        1825574400, // November 7, 2027 - DST ends
         // Add more years if needed
     };
 
