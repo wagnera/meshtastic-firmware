@@ -224,8 +224,8 @@ SO GPIO 39/TXEN MAY NOT BE DEFINED FOR SUCCESSFUL OPERATION OF THE SX1262 - TG
 #define PIN_GPS_EN PIN_3V3_EN
 #define PIN_GPS_PPS (17) // Pulse per second input from the GPS
 
-// #define GPS_RX_PIN PIN_SERIAL1_RX
-// #define GPS_TX_PIN PIN_SERIAL1_TX
+#define GPS_RX_PIN PIN_SERIAL1_RX
+#define GPS_TX_PIN PIN_SERIAL1_TX
 
 // Define pin to enable GPS toggle (set GPIO to LOW) via user button triple press
 

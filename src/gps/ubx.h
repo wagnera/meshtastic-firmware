@@ -36,8 +36,8 @@ const uint8_t GPS::_message_GNSS_7[] = {
     0xff, // numTrkChUse (max number of channels to use, 0xff = max available)
     0x02, // numConfigBlocks (number of GNSS systems), most modules support maximum 3 GNSS systems
     // GNSS config format: gnssId, resTrkCh, maxTrkCh, reserved1, flags
-    0x00, 0x08, 0x10, 0x00, 0x01, 0x00, 0x00, 0x01, // GPS
-    0x01, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x01  // SBAS
+    0x00, 0x08, 0x10, 0x00, 0x01, 0x00, 0x01, 0x01, // GPS
+    0x01, 0x01, 0x03, 0x00, 0x01, 0x00, 0x01, 0x01  // SBAS
 };
 
 // It's not critical if the module doesn't acknowledge this configuration.
@@ -109,9 +109,22 @@ const uint8_t GPS::_message_NAVX5[] = {
 // Additionally, for some new modules like the M9/M10, an update rate lower than 5Hz
 // is recommended to avoid a known issue with satellites disappearing.
 const uint8_t GPS::_message_1HZ[] = {
-    0xE8, 0x03, // Measurement Rate (1000ms for 1Hz)
+    0xE8, 0x00, // Measurement Rate (1000ms for 1Hz)
     0x01, 0x00, // Navigation rate, always 1 in GPS mode
     0x01, 0x00, // Time reference
+};
+
+// Set GPS UART Port 1 to enabled
+const uint8_t GPS::_message_message_uart_enable[] = {
+    0x01, //Guessing 1 is UART 1 supposed to be in "integration manual"
+    0x00, // Reserved
+    0x00, 0x00, // TX Ready disabled
+    0x60, 0x00, 0x00, 0x00, //mode
+    0x80, 0x25, 0x00, 0x00, //Baud
+    0x04, 0x00, // IN Proto Mask
+    0x02, 0x00, // Out Proto Mask
+    0x00, 0x00, // Flags
+    0x00, 0x00 // Reserved
 };
 
 // Disable GGL. GGL - Geographic position (latitude and longitude), which provides the current geographical

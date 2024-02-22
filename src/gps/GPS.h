@@ -50,6 +50,7 @@ class GPS : private concurrency::OSThread
   private:
     uint32_t lastWakeStartMsec = 0, lastSleepStartMsec = 0, lastWhileActiveMsec = 0;
     const int serialSpeeds[6] = {9600, 4800, 38400, 57600, 115200, 9600};
+    // const int serialSpeeds[6] = {115200, 57600, 38400, 4800, 9600, 9600};
 
     uint32_t rx_gpio = 0;
     uint32_t tx_gpio = 0;
@@ -93,6 +94,7 @@ class GPS : private concurrency::OSThread
     static const uint8_t _message_JAM[];
     static const uint8_t _message_NAVX5[];
     static const uint8_t _message_1HZ[];
+    static const uint8_t _message_message_uart_enable[];
     static const uint8_t _message_GGL[];
     static const uint8_t _message_GSA[];
     static const uint8_t _message_GSV[];

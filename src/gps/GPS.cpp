@@ -302,7 +302,7 @@ bool GPS::setup()
 
             if (strncmp(info.hwVersion, "00040007", 8) !=
                 0) { // The original ublox 6 is GPS only and doesn't support the UBX-CFG-GNSS message
-                if (strncmp(info.hwVersion, "00070000", 8) == 0) { // Max7 seems to only support GPS *or* GLONASS
+                if (strncmp(info.hwVersion, "00080000", 8) == 0) { // Max7 seems to only support GPS *or* GLONASS
                     LOG_DEBUG("Setting GPS+SBAS\n");
                     msglen = makeUBXPacket(0x06, 0x3e, sizeof(_message_GNSS_7), _message_GNSS_7);
                     _serial_gps->write(UBXscratch, msglen);
@@ -315,7 +315,7 @@ bool GPS::setup()
                     // It's not critical if the module doesn't acknowledge this configuration.
                     LOG_INFO("Unable to reconfigure GNSS - defaults maintained. Is this module GPS-only?\n");
                 } else {
-                    if (strncmp(info.hwVersion, "00070000", 8) == 0) {
+                    if (strncmp(info.hwVersion, "00080000", 8) == 0) {
                         LOG_INFO("GNSS configured for GPS+SBAS. Pause for 0.75s before sending next command.\n");
                     } else {
                         LOG_INFO("GNSS configured for GPS+SBAS+GLONASS. Pause for 0.75s before sending next command.\n");
@@ -345,6 +345,12 @@ bool GPS::setup()
             if (getACK(0x06, 0x08, 300) != GNSS_RESPONSE_OK) {
                 LOG_WARN("Unable to set GPS update rate.\n");
             }
+
+            // msglen = makeUBXPacket(0x06, 0x00, sizeof(_message_message_uart_enable), _message_message_uart_enable);
+            // _serial_gps->write(UBXscratch, msglen);
+            // if (getACK(0x06, 0x00, 300) != GNSS_RESPONSE_OK) {
+            //     LOG_WARN("Unable to set UART 1\n");
+            // }
 
             msglen = makeUBXPacket(0x06, 0x01, sizeof(_message_GGL), _message_GGL);
             _serial_gps->write(UBXscratch, msglen);
@@ -582,9 +588,10 @@ int32_t GPS::runOnce()
             // reset the GPS on next bootup
             if (devicestate.did_gps_reset && (millis() > 60000) && !hasFlow()) {
                 LOG_DEBUG("GPS is not communicating, trying factory reset on next bootup.\n");
-                devicestate.did_gps_reset = false;
-                nodeDB.saveDeviceStateToDisk();
-                disable(); // Stop the GPS thread as it can do nothing useful until next reboot.
+                // devicestate.did_gps_reset = false;
+                // nodeDB.saveDeviceStateToDisk();
+                // disable(); // Stop the GPS thread as it can do nothing useful until next reboot.
+                setConnected();
             }
         }
     }
@@ -1146,7 +1153,7 @@ bool GPS::whileIdle()
     // First consume any chars that have piled up at the receiver
     while (_serial_gps->available() > 0) {
         int c = _serial_gps->read();
-        // LOG_DEBUG("%c", c);
+        LOG_DEBUG("%c", c);
         isValid |= reader.encode(c);
     }
 
