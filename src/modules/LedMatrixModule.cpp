@@ -54,14 +54,15 @@ size_t current_text_length;
 uint16_t current_color;
 int scroll_x;
 int repeat_text = 0;
+int gate_msg_sent = false;
 
 char text_trigger = 'L';
-int max_index = 9; //update this when adding new text
+int max_index = 10; //update this when adding new text
 
 static const char* const text_messages[] = {"This is a test", "Lunch Time!!", "Foos o'clock!", "Zito's Time!", "Thai Tuesday!",
-                                            "Thai Thursday!", "Soccer Time", "Running Time", "Taco Tuesday!", "Moo goo Monday!"};
+                                            "Thai Thursday!", "Soccer Time", "Running Time", "Taco Tuesday!", "Moo goo Monday!", "Warning Gate Closing in 10 Minutes!!!"};
 static const int text_sizes[] = {sizeof("This is a test"),sizeof("Lunch Time!!"), sizeof("Foos o'clock!"), sizeof("Zito's Time!"), sizeof("Thai Tuesday!"),
-                                 sizeof("Thai Thursday!"), sizeof("Soccer Time"), sizeof("Running Time"), sizeof("Taco Tuesday!"), sizeof("Moo goo Monday!")};
+                                 sizeof("Thai Thursday!"), sizeof("Soccer Time"), sizeof("Running Time"), sizeof("Taco Tuesday!"), sizeof("Moo goo Monday!"), sizeof("Warning Gate Closing in 10 Minutes!!!")};
 
 // Function to convert Unix time to Central Time (CT) with DST adjustments
 tm unixTimeToCT(long long unixTime) {
@@ -227,6 +228,33 @@ int32_t LedMatrixModule::runOnce()
         matrix.setBrightness(50);
         // matrix.setTextColor(colors[0]);
     }
+    // uint32_t current_unix_time = getValidTime(RTCQualityFromNet);
+    uint32_t current_unix_time = getValidTime(RTCQualityGPS);
+    if (current_unix_time != 0)
+    {
+        tm ctTimeInfo = unixTimeToCT(current_unix_time);
+        if (ctTimeInfo.tm_hour == 18 && ctTimeInfo.tm_min == 50)
+        {
+            if (!gate_msg_sent)
+            {
+                LOG_DEBUG("Time to send gate message\n");
+                gate_msg_sent = true;
+                const char *gate_cmd_str = "L:";
+                auto gate_msg = allocDataPacket();                 // Allocate a packet for sending
+                gate_msg->decoded.payload.size = strlen(gate_cmd_str); // You must specify how many bytes are in the reply
+                memcpy(gate_msg->decoded.payload.bytes, gate_cmd_str, gate_msg->decoded.payload.size);
+                service.sendToMesh(gate_msg);
+            }
+            else
+            {
+                // LOG_DEBUG("Already sent  gate message\n");
+            }
+        }
+        else
+        {
+            gate_msg_sent = false;
+        }
+    }
     if(current_animation)
     {
         scrollText();
@@ -241,6 +269,9 @@ int32_t LedMatrixModule::runOnce()
 bool LedMatrixModule::wantPacket(const meshtastic_MeshPacket *p)
 {
     LOG_DEBUG("led want packet port: %i\n",p->decoded.portnum);
+    // LOG_DEBUG("led want test msg: %i\n",p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP);
+    // LOG_DEBUG("led want hardware msg: %i\n",p->decoded.portnum == meshtastic_PortNum_REMOTE_HARDWARE_APP);
+    // LOG_DEBUG("led want final msg: %i\n",(p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP || p->decoded.portnum == meshtastic_PortNum_REMOTE_HARDWARE_APP));
     // return 1;
     // return MeshService::isTextPayload(p);
     return (p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP || p->decoded.portnum == meshtastic_PortNum_REMOTE_HARDWARE_APP);
@@ -256,6 +287,7 @@ LedMatrixModule::LedMatrixModule()
     */
 
     if (moduleConfig.led_matrix.enabled) {
+        loopbackOk = true; // Allow locally generated messages to loop back to the client
         
     } else {
         LOG_INFO("External Notification Module Disabled\n");
@@ -293,7 +325,14 @@ ProcessMessage LedMatrixModule::handleReceived(const meshtastic_MeshPacket &mp)
                 }
                 current_text = text_messages[msg_index];
                 current_text_length = text_sizes[msg_index];
-                current_color = matrix.Color(255, 0, 255);
+                if (msg_index == 9)
+                {
+                    current_color = matrix.Color(226, 46, 43); // For gate warning
+                }
+                else
+                {
+                    current_color = matrix.Color(255, 0, 255);
+                }
                 current_animation = true;
                 repeat_text = 3;
             }
@@ -322,7 +361,14 @@ ProcessMessage LedMatrixModule::handleReceived(const meshtastic_MeshPacket &mp)
             }
             current_text = text_messages[msg_index];
             current_text_length = text_sizes[msg_index];
-            current_color = matrix.Color(255, 0, 255);
+            if (msg_index == 9)
+            {
+                current_color = matrix.Color(226, 46, 43); // For gate warning
+            }
+            else
+            {
+                current_color = matrix.Color(255, 0, 255);
+            }
             current_animation = true;
             repeat_text = 3;
         }
