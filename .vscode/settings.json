@@ -2,7 +2,10 @@
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "trunk.io",
   "trunk.enableWindows": true,
-  "files.associations": {
-    "streambuf": "cpp"
+  "files.insertFinalNewline": false,
+  "files.trimFinalNewlines": false,
+  "cmake.configureOnOpen": false,
+  "[cpp]": {
+    "editor.defaultFormatter": "trunk.io"
   }
 }

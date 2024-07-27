@@ -13,6 +13,11 @@
 #if defined(ARCH_PORTDUINO) && !HAS_RADIO
 #include "../platform/portduino/SimRadio.h"
 #endif
+#ifdef ARCH_ESP32
+#if !MESHTASTIC_EXCLUDE_STOREFORWARD
+#include "modules/esp32/StoreForwardModule.h"
+#endif
+#endif
 
 extern Allocator<meshtastic_QueueStatus> &queueStatusPool;
 extern Allocator<meshtastic_MqttClientProxyMessage> &mqttClientProxyMessagePool;
@@ -23,9 +28,10 @@ extern Allocator<meshtastic_MqttClientProxyMessage> &mqttClientProxyMessagePool;
  */
 class MeshService
 {
+#if HAS_GPS
     CallbackObserver<MeshService, const meshtastic::GPSStatus *> gpsObserver =
         CallbackObserver<MeshService, const meshtastic::GPSStatus *>(this, &MeshService::onGPSChanged);
-
+#endif
     /// received packets waiting for the phone to process them
     /// FIXME, change to a DropOldestQueue and keep a count of the number of dropped packets to ensure
     /// we never hang because android hasn't been there in a while
@@ -82,6 +88,9 @@ class MeshService
     /// Return the next MqttClientProxyMessage packet destined to the phone.
     meshtastic_MqttClientProxyMessage *getMqttClientProxyMessageForPhone() { return toPhoneMqttProxyQueue.dequeuePtr(0); }
 
+    // search the queue for a request id and return the matching nodenum
+    NodeNum getNodenumFromRequestId(uint32_t request_id);
+
     // Release QueueStatus packet to pool
     void releaseQueueStatusToPool(meshtastic_QueueStatus *p) { queueStatusPool.release(p); }
 
@@ -104,8 +113,9 @@ class MeshService
     void reloadOwner(bool shouldSave = true);
 
     /// Called when the user wakes up our GUI, normally sends our latest location to the mesh (if we have it), otherwise at least
-    /// sends our owner
-    void sendNetworkPing(NodeNum dest, bool wantReplies = false);
+    /// sends our nodeinfo
+    /// returns true if we sent a position
+    bool trySendPosition(NodeNum dest, bool wantReplies = false);
 
     /// Send a packet into the mesh - note p must have been allocated from packetPool.  We will return it to that pool after
     /// sending. This is the ONLY function you should use for sending messages into the mesh, because it also updates the nodedb
@@ -126,17 +136,18 @@ class MeshService
 
     bool isToPhoneQueueEmpty();
 
+    ErrorCode sendQueueStatusToPhone(const meshtastic_QueueStatus &qs, ErrorCode res, uint32_t mesh_packet_id);
+
   private:
+#if HAS_GPS
     /// Called when our gps position has changed - updates nodedb and sends Location message out into the mesh
     /// returns 0 to allow further processing
     int onGPSChanged(const meshtastic::GPSStatus *arg);
-
-    /// Handle a packet that just arrived from the radio.  This method does _ReliableRouternot_ free the provided packet.  If it
+#endif
+    /// Handle a packet that just arrived from the radio.  This method does _not_ free the provided packet.  If it
     /// needs to keep the packet around it makes a copy
     int handleFromRadio(const meshtastic_MeshPacket *p);
     friend class RoutingModule;
-
-    ErrorCode sendQueueStatusToPhone(const meshtastic_QueueStatus &qs, ErrorCode res, uint32_t mesh_packet_id);
 };
 
 extern MeshService service;

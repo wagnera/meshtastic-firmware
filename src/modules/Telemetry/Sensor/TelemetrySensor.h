@@ -1,9 +1,17 @@
+#include "configuration.h"
+
+#if !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
+
 #pragma once
 #include "../mesh/generated/meshtastic/telemetry.pb.h"
+#include "MeshModule.h"
 #include "NodeDB.h"
+#include <utility>
+
+class TwoWire;
 
 #define DEFAULT_SENSOR_MINIMUM_WAIT_TIME_BETWEEN_READS 1000
-extern uint8_t nodeTelemetrySensorsMap[_meshtastic_TelemetrySensorType_MAX + 1];
+extern std::pair<uint8_t, TwoWire *> nodeTelemetrySensorsMap[_meshtastic_TelemetrySensorType_MAX + 1];
 
 class TelemetrySensor
 {
@@ -16,7 +24,7 @@ class TelemetrySensor
     }
 
     const char *sensorName;
-    meshtastic_TelemetrySensorType sensorType;
+    meshtastic_TelemetrySensorType sensorType = meshtastic_TelemetrySensorType_SENSOR_UNSET;
     unsigned status;
     bool initialized = false;
 
@@ -24,9 +32,9 @@ class TelemetrySensor
     {
         if (!status) {
             LOG_WARN("Could not connect to detected %s sensor.\n Removing from nodeTelemetrySensorsMap.\n", sensorName);
-            nodeTelemetrySensorsMap[sensorType] = 0;
+            nodeTelemetrySensorsMap[sensorType].first = 0;
         } else {
-            LOG_INFO("Opened %s sensor on default i2c bus\n", sensorName);
+            LOG_INFO("Opened %s sensor on i2c bus\n", sensorName);
             setup();
         }
         initialized = true;
@@ -35,7 +43,13 @@ class TelemetrySensor
     virtual void setup();
 
   public:
-    bool hasSensor() { return sensorType < sizeof(nodeTelemetrySensorsMap) && nodeTelemetrySensorsMap[sensorType] > 0; }
+    virtual AdminMessageHandleResult handleAdminMessage(const meshtastic_MeshPacket &mp, meshtastic_AdminMessage *request,
+                                                        meshtastic_AdminMessage *response)
+    {
+        return AdminMessageHandleResult::NOT_HANDLED;
+    }
+
+    bool hasSensor() { return nodeTelemetrySensorsMap[sensorType].first > 0; }
 
     virtual int32_t runOnce() = 0;
     virtual bool isInitialized() { return initialized; }
@@ -43,3 +57,5 @@ class TelemetrySensor
 
     virtual bool getMetrics(meshtastic_Telemetry *measurement) = 0;
 };
+
+#endif

@@ -133,10 +133,6 @@ static const uint8_t SCK = PIN_SPI_SCK;
 #define PIN_EINK_SCLK (0 + 3)
 #define PIN_EINK_MOSI (0 + 30) // also called SDI
 
-// Controls power for the eink display - Board power is enabled either by VBUS from USB or the CPU asserting PWR_ON
-// FIXME - I think this is actually just the board power enable - it enables power to the CPU also
-// #define PIN_EINK_PWR_ON (-1)
-
 // #define USE_EINK
 
 // RAKRGB
@@ -181,13 +177,13 @@ static const uint8_t SCK = PIN_SPI_SCK;
 
 /* Setup of the SX1262 LoRa module ( https://docs.rakwireless.com/Product-Categories/WisBlock/RAK4631/Datasheet/ )
 
-P1.10 	NSS 	SPI NSS (Arduino GPIO number 42)
-P1.11 	SCK 	SPI CLK (Arduino GPIO number 43)
-P1.12 	MOSI 	SPI MOSI (Arduino GPIO number 44)
-P1.13 	MISO 	SPI MISO (Arduino GPIO number 45)
-P1.14 	BUSY 	BUSY signal (Arduino GPIO number 46)
-P1.15 	DIO1 	DIO1 event interrupt (Arduino GPIO number 47)
-P1.06 	NRESET 	NRESET manual reset of the SX1262 (Arduino GPIO number 38)
+P1.10   NSS     SPI NSS (Arduino GPIO number 42)
+P1.11   SCK     SPI CLK (Arduino GPIO number 43)
+P1.12   MOSI    SPI MOSI (Arduino GPIO number 44)
+P1.13   MISO    SPI MISO (Arduino GPIO number 45)
+P1.14   BUSY    BUSY signal (Arduino GPIO number 46)
+P1.15   DIO1    DIO1 event interrupt (Arduino GPIO number 47)
+P1.06   NRESET  NRESET manual reset of the SX1262 (Arduino GPIO number 38)
 
 Important for successful SX1262 initialization:
 
@@ -201,6 +197,8 @@ SO GPIO 39/TXEN MAY NOT BE DEFINED FOR SUCCESSFUL OPERATION OF THE SX1262 - TG
 
 */
 
+#define DETECTION_SENSOR_EN 4
+
 #define USE_SX1262
 #define SX126X_CS (42)
 #define SX126X_DIO1 (47)
@@ -209,9 +207,15 @@ SO GPIO 39/TXEN MAY NOT BE DEFINED FOR SUCCESSFUL OPERATION OF THE SX1262 - TG
 // #define SX126X_TXEN (39)
 // #define SX126X_RXEN (37)
 #define SX126X_POWER_EN (37)
-#define SX126X_E22 // DIO2 controlls an antenna switch and the TCXO voltage is controlled by DIO3
+// DIO2 controlls an antenna switch and the TCXO voltage is controlled by DIO3
+#define SX126X_DIO2_AS_RF_SWITCH
+#define SX126X_DIO3_TCXO_VOLTAGE 1.8
+
+// Testing USB detection
+#define NRF_APM
 
 // enables 3.3V periphery like GPS or IO Module
+// Do not toggle this for GPS power savings
 #define PIN_3V3_EN (34)
 
 // RAK1910 GPS module
@@ -221,7 +225,7 @@ SO GPIO 39/TXEN MAY NOT BE DEFINED FOR SUCCESSFUL OPERATION OF THE SX1262 - TG
 // Therefore must be 1 to keep peripherals powered
 // Power is on the controllable 3V3_S rail
 // #define PIN_GPS_RESET (34)
-#define PIN_GPS_EN PIN_3V3_EN
+// #define PIN_GPS_EN PIN_3V3_EN
 #define PIN_GPS_PPS (17) // Pulse per second input from the GPS
 
 // #define GPS_RX_PIN PIN_SERIAL1_RX
@@ -242,19 +246,10 @@ SO GPIO 39/TXEN MAY NOT BE DEFINED FOR SUCCESSFUL OPERATION OF THE SX1262 - TG
 // and has 12 bit resolution
 #define BATTERY_SENSE_RESOLUTION_BITS 12
 #define BATTERY_SENSE_RESOLUTION 4096.0
-// Definition of milliVolt per LSB => 3.0V ADC range and 12-bit ADC resolution = 3000mV/4096
-#define VBAT_MV_PER_LSB (0.73242188F)
-// Voltage divider value => 1.5M + 1M voltage divider on VBAT = (1.5M / (1M + 1.5M))
-#define VBAT_DIVIDER (0.4F)
-// Compensation factor for the VBAT divider
-#define VBAT_DIVIDER_COMP (1.73)
-// Fixed calculation of milliVolt from compensation value
-#define REAL_VBAT_MV_PER_LSB (VBAT_DIVIDER_COMP * VBAT_MV_PER_LSB)
 #undef AREF_VOLTAGE
 #define AREF_VOLTAGE 3.0
 #define VBAT_AR_INTERNAL AR_INTERNAL_3_0
-#define ADC_MULTIPLIER VBAT_DIVIDER_COMP // REAL_VBAT_MV_PER_LSB
-#define VBAT_RAW_TO_SCALED(x) (REAL_VBAT_MV_PER_LSB * x)
+#define ADC_MULTIPLIER 1.73
 
 #define HAS_RTC 1
 

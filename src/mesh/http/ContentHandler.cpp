@@ -1,3 +1,4 @@
+#if !MESHTASTIC_EXCLUDE_WEBSERVER
 #include "NodeDB.h"
 #include "PowerFSM.h"
 #include "RadioLibInterface.h"
@@ -5,9 +6,11 @@
 #include "main.h"
 #include "mesh/http/ContentHelper.h"
 #include "mesh/http/WebServer.h"
-#include "mesh/http/WiFiAPClient.h"
-#include "mqtt/JSON.h"
+#if HAS_WIFI
+#include "mesh/wifi/WiFiAPClient.h"
+#endif
 #include "power.h"
+#include "serialization/JSON.h"
 #include "sleep.h"
 #include <FSCommon.h>
 #include <HTTPBodyParser.hpp>
@@ -144,8 +147,8 @@ void handleAPIv1FromRadio(HTTPRequest *req, HTTPResponse *res)
 
     /*
         For documentation, see:
-            https://meshtastic.org/docs/developers/device/http-api
-            https://meshtastic.org/docs/developers/device/device-api
+            https://meshtastic.org/docs/development/device/http-api
+            https://meshtastic.org/docs/development/device/client-api
     */
 
     // Get access to the parameters
@@ -194,8 +197,8 @@ void handleAPIv1ToRadio(HTTPRequest *req, HTTPResponse *res)
 
     /*
         For documentation, see:
-            https://meshtastic.org/docs/developers/device/http-api
-            https://meshtastic.org/docs/developers/device/device-api
+            https://meshtastic.org/docs/development/device/http-api
+            https://meshtastic.org/docs/development/device/client-api
     */
 
     res->setHeader("Content-Type", "application/x-protobuf");
@@ -398,7 +401,7 @@ void handleStatic(HTTPRequest *req, HTTPResponse *res)
             if (!file.available()) {
                 LOG_WARN("File not available - %s\n", filenameGzip.c_str());
                 res->println("Web server is running.<br><br>The content you are looking for can't be found. Please see: <a "
-                             "href=https://meshtastic.org/docs/getting-started/faq#wifi--web-browser>FAQ</a>.<br><br><a "
+                             "href=https://meshtastic.org/docs/software/web-client/>FAQ</a>.<br><br><a "
                              "href=/admin>admin</a>");
 
                 return;
@@ -855,3 +858,4 @@ void handleScanNetworks(HTTPRequest *req, HTTPResponse *res)
     res->print(value->Stringify().c_str());
     delete value;
 }
+#endif

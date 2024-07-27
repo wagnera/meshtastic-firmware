@@ -1,20 +1,11 @@
-
 #include "configuration.h"
-#if defined(ARCH_ESP32)
+#if defined(ARCH_ESP32) && defined(USE_SX1280)
 #include "AudioModule.h"
 #include "FSCommon.h"
 #include "MeshService.h"
 #include "NodeDB.h"
 #include "RTC.h"
 #include "Router.h"
-
-#ifdef OLED_RU
-#include "graphics/fonts/OLEDDisplayFontsRU.h"
-#endif
-
-#ifdef OLED_UA
-#include "graphics/fonts/OLEDDisplayFontsUA.h"
-#endif
 
 /*
     AudioModule
@@ -48,32 +39,7 @@ AudioModule *audioModule;
 #define YIELD_FROM_ISR(x) portYIELD_FROM_ISR(x)
 #endif
 
-#if (defined(USE_EINK) || defined(ILI9341_DRIVER) || defined(ST7735_CS) || defined(ST7789_CS)) &&                                \
-    !defined(DISPLAY_FORCE_SMALL_FONTS)
-
-// The screen is bigger so use bigger fonts
-#define FONT_SMALL ArialMT_Plain_16
-#define FONT_MEDIUM ArialMT_Plain_24
-#define FONT_LARGE ArialMT_Plain_24
-#else
-#ifdef OLED_RU
-#define FONT_SMALL ArialMT_Plain_10_RU
-#else
-#ifdef OLED_UA
-#define FONT_SMALL ArialMT_Plain_10_UA
-#else
-#define FONT_SMALL ArialMT_Plain_10
-#endif
-#endif
-#define FONT_MEDIUM ArialMT_Plain_16
-#define FONT_LARGE ArialMT_Plain_24
-#endif
-
-#define fontHeight(font) ((font)[1] + 1) // height is position 1
-
-#define FONT_HEIGHT_SMALL fontHeight(FONT_SMALL)
-#define FONT_HEIGHT_MEDIUM fontHeight(FONT_MEDIUM)
-#define FONT_HEIGHT_LARGE fontHeight(FONT_LARGE)
+#include "graphics/ScreenFonts.h"
 
 void run_codec2(void *parameter)
 {
@@ -145,7 +111,7 @@ AudioModule::AudioModule() : SinglePortModule("AudioModule", meshtastic_PortNum_
         encode_frame_num = (meshtastic_Constants_DATA_PAYLOAD_LEN - sizeof(tx_header)) / encode_codec_size;
         encode_frame_size = encode_frame_num * encode_codec_size; // max 233 bytes + 4 header bytes
         adc_buffer_size = codec2_samples_per_frame(codec2);
-        LOG_INFO(" using %d frames of %d bytes for a total payload length of %d bytes\n", encode_frame_num, encode_codec_size,
+        LOG_INFO("using %d frames of %d bytes for a total payload length of %d bytes\n", encode_frame_num, encode_codec_size,
                  encode_frame_size);
         xTaskCreate(&run_codec2, "codec2_task", 30000, NULL, 5, &codec2HandlerTask);
     } else {
@@ -224,13 +190,13 @@ int32_t AudioModule::runOnce()
 
             firstTime = false;
         } else {
-            UIFrameEvent e = {false, true};
+            UIFrameEvent e;
             // Check if PTT is pressed. TODO hook that into Onebutton/Interrupt drive.
             if (digitalRead(moduleConfig.audio.ptt_pin ? moduleConfig.audio.ptt_pin : PTT_PIN) == HIGH) {
                 if (radio_state == RadioState::rx) {
                     LOG_INFO("PTT pressed, switching to TX\n");
                     radio_state = RadioState::tx;
-                    e.frameChanged = true;
+                    e.action = UIFrameEvent::Action::REGENERATE_FRAMESET; // We want to change the list of frames shown on-screen
                     this->notifyObservers(&e);
                 }
             } else {
@@ -243,7 +209,7 @@ int32_t AudioModule::runOnce()
                     }
                     tx_encode_frame_index = sizeof(tx_header);
                     radio_state = RadioState::rx;
-                    e.frameChanged = true;
+                    e.action = UIFrameEvent::Action::REGENERATE_FRAMESET; // We want to change the list of frames shown on-screen
                     this->notifyObservers(&e);
                 }
             }
@@ -307,7 +273,7 @@ ProcessMessage AudioModule::handleReceived(const meshtastic_MeshPacket &mp)
 {
     if ((moduleConfig.audio.codec2_enabled) && (myRegion->audioPermitted)) {
         auto &p = mp.decoded;
-        if (getFrom(&mp) != nodeDB.getNodeNum()) {
+        if (getFrom(&mp) != nodeDB->getNodeNum()) {
             memcpy(rx_encode_frame, p.payload.bytes, p.payload.size);
             radio_state = RadioState::rx;
             rx_encode_frame_index = p.payload.size;

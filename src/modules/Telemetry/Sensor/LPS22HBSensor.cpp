@@ -1,7 +1,10 @@
-#include "LPS22HBSensor.h"
-#include "../mesh/generated/meshtastic/telemetry.pb.h"
-#include "TelemetrySensor.h"
 #include "configuration.h"
+
+#if !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
+
+#include "../mesh/generated/meshtastic/telemetry.pb.h"
+#include "LPS22HBSensor.h"
+#include "TelemetrySensor.h"
 #include <Adafruit_LPS2X.h>
 #include <Adafruit_Sensor.h>
 
@@ -13,7 +16,7 @@ int32_t LPS22HBSensor::runOnce()
     if (!hasSensor()) {
         return DEFAULT_SENSOR_MINIMUM_WAIT_TIME_BETWEEN_READS;
     }
-    status = lps22hb.begin_I2C(nodeTelemetrySensorsMap[sensorType]);
+    status = lps22hb.begin_I2C(nodeTelemetrySensorsMap[sensorType].first, nodeTelemetrySensorsMap[sensorType].second);
     return initI2CSensor();
 }
 
@@ -33,3 +36,5 @@ bool LPS22HBSensor::getMetrics(meshtastic_Telemetry *measurement)
 
     return true;
 }
+
+#endif

@@ -22,6 +22,11 @@ extern NimbleBluetooth *nimbleBluetooth;
 extern NRF52Bluetooth *nrf52Bluetooth;
 #endif
 
+#if ARCH_PORTDUINO
+extern HardwareSPI *DisplaySPI;
+extern HardwareSPI *LoraSPI;
+
+#endif
 extern ScanI2C::DeviceAddress screen_found;
 extern ScanI2C::DeviceAddress cardkb_found;
 extern uint8_t kb_model;
@@ -42,12 +47,24 @@ extern ATECCX08A atecc;
 #include <Adafruit_DRV2605.h>
 extern Adafruit_DRV2605 drv;
 #endif
+
+#ifdef HAS_I2S
+#include "AudioThread.h"
+extern AudioThread *audioThread;
+#endif
+
+// Global Screen singleton.
+extern graphics::Screen *screen;
+
+#if !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL) && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
+#include "AccelerometerThread.h"
+extern AccelerometerThread *accelerometerThread;
+#endif
+
 extern bool isVibrating;
 
 extern int TCPPort; // set by Portduino
 
-// Global Screen singleton.
-extern graphics::Screen *screen;
 // extern Observable<meshtastic::PowerStatus> newPowerStatus; //TODO: move this to main-esp32.cpp somehow or a helper class
 
 // extern meshtastic::PowerStatus *powerStatus;
@@ -68,7 +85,9 @@ extern uint32_t serialSinceMsec;
 // This will suppress the current delay and instead try to run ASAP.
 extern bool runASAP;
 
-void nrf52Setup(), esp32Setup(), nrf52Loop(), esp32Loop(), rp2040Setup(), clearBonds();
+extern bool pauseBluetoothLogging;
+
+void nrf52Setup(), esp32Setup(), nrf52Loop(), esp32Loop(), rp2040Setup(), clearBonds(), enterDfuMode();
 
 meshtastic_DeviceMetadata getDeviceMetadata();
 

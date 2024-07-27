@@ -44,7 +44,11 @@ extern "C" {
 // LEDs
 #define PIN_LED1 (3)
 #define PIN_LED2 (4)
-#define PIN_NEOPIXEL (8)
+// #define PIN_NEOPIXEL (8)
+#define HAS_NEOPIXEL                         // Enable the use of neopixels
+#define NEOPIXEL_COUNT 1                     // How many neopixels are connected
+#define NEOPIXEL_DATA 8                      // gpio pin used to send data to the neopixels
+#define NEOPIXEL_TYPE (NEO_GRB + NEO_KHZ800) // type of neopixels in use
 
 #define LED_BUILTIN PIN_LED1
 #define LED_CONN PIN_LED2
@@ -80,6 +84,7 @@ static const uint8_t A5 = PIN_A5;
 // Other pins
 #define PIN_AREF PIN_A5
 #define PIN_VBAT PIN_A4
+#define BATTERY_PIN PIN_VBAT
 #define PIN_NFC1 (33)
 #define PIN_NFC2 (2)
 #define PIN_PIEZO (37)
@@ -134,7 +139,8 @@ static const uint8_t SCK = PIN_SPI_SCK;
 #define SX126X_TXEN (31)
 #define SX126X_POWER_EN                                                                                                          \
     (15) // FIXME, see warning hre  https://github.com/BigCorvus/SX1262-LoRa-BLE-Relay/blob/master/LORA_RELAY_NRF52840.ino
-#define SX126X_E22 // Indicates this SX1262 is inside of an ebyte E22 module and special config should be done for that
+// Indicates this SX1262 is inside of an ebyte E22 module and special config should be done for that
+#define SX126X_DIO3_TCXO_VOLTAGE 1.8
 
 #define ST7735_RESET (11) // Output
 #define ST7735_CS (12)

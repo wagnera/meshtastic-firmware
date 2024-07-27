@@ -5,7 +5,7 @@
 #define VARIANT_MCK (64000000ul)
 
 #define USE_LFXO // Board uses 32khz crystal for LF
-//#define USE_LFRC    // Board uses RC for LF
+// #define USE_LFRC    // Board uses RC for LF
 
 /*----------------------------------------------------------------------------
  *        Headers
@@ -125,7 +125,6 @@ static const uint8_t SCK = PIN_SPI_SCK;
 
 #define SX126X_TXEN RADIOLIB_NC
 #define SX126X_RXEN D7
-#define E22_TXEN_CONNECTED_TO_DIO2
 
 // ------------------------------ OR ------------------------------
 
@@ -141,7 +140,18 @@ static const uint8_t SCK = PIN_SPI_SCK;
 #ifdef EBYTE_E22
 // Internally the TTGO module hooks the SX126x-DIO2 in to control the TX/RX switch
 // (which is the default for the sx1262interface code)
-#define SX126X_E22
+#define SX126X_DIO2_AS_RF_SWITCH
+#define SX126X_DIO3_TCXO_VOLTAGE 1.8
+#ifdef EBYTE_E22_900M30S
+// 10dB PA gain and 30dB rated output; based on PA output table from Ebyte Robin <sales06@ebyte.com>
+#define REGULATORY_GAIN_LORA 10
+#define SX126X_MAX_POWER 20
+#endif
+#ifdef EBYTE_E22_900M33S
+// 25dB PA gain and 33dB rated output; based on TX Power Curve from E22-900M33S_UserManual_EN_v1.0.pdf
+#define REGULATORY_GAIN_LORA 25
+#define SX126X_MAX_POWER 8
+#endif
 #endif
 
 /*
@@ -181,6 +191,7 @@ static const uint8_t SCL = PIN_WIRE_SCL;
 #define BAT_READ                                                                                                                 \
     14 // P0_14 = 14  Reads battery voltage from divider on signal board. (PIN_VBAT is reading voltage divider on XIAO and is
        // program pin 32 / or P0.31)
+#define BATTERY_SENSE_RESOLUTION_BITS 10
 #define CHARGE_LED 23 // P0_17 = 17  D23   YELLOW CHARGE LED
 #define HICHG 22      // P0_13 = 13  D22   Charge-select pin for Lipo for 100 mA instead of default 50mA charge
 

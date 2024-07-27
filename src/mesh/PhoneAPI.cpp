@@ -1,12 +1,17 @@
-#include "PhoneAPI.h"
-#include "Channels.h"
+#include "configuration.h"
+#if !MESHTASTIC_EXCLUDE_GPS
 #include "GPS.h"
+#endif
+
+#include "Channels.h"
+#include "Default.h"
+#include "FSCommon.h"
 #include "MeshService.h"
 #include "NodeDB.h"
+#include "PhoneAPI.h"
 #include "PowerFSM.h"
 #include "RadioInterface.h"
 #include "TypeConversions.h"
-#include "configuration.h"
 #include "main.h"
 #include "xmodem.h"
 
@@ -17,8 +22,9 @@
 #if ToRadio_size > MAX_TO_FROM_RADIO_SIZE
 #error ToRadio is too big
 #endif
-
+#if !MESHTASTIC_EXCLUDE_MQTT
 #include "mqtt/MQTT.h"
+#endif
 
 PhoneAPI::PhoneAPI()
 {
@@ -36,11 +42,16 @@ void PhoneAPI::handleStartConfig()
     if (!isConnected()) {
         onConnectionChanged(true);
         observe(&service.fromNumChanged);
+#ifdef FSCom
         observe(&xModem.packetReady);
+#endif
     }
 
     // even if we were already connected - restart our state machine
     state = STATE_SEND_MY_INFO;
+    pauseBluetoothLogging = true;
+    filesManifest = getFiles("/", 10);
+    LOG_DEBUG("Got %d files in manifest\n", filesManifest.size());
 
     LOG_INFO("Starting API client config\n");
     nodeInfoForPhone.num = 0; // Don't keep returning old nodeinfos
@@ -53,7 +64,9 @@ void PhoneAPI::close()
         state = STATE_SEND_NOTHING;
 
         unobserve(&service.fromNumChanged);
+#ifdef FSCom
         unobserve(&xModem.packetReady);
+#endif
         releasePhonePacket(); // Don't leak phone packets on shutdown
         releaseQueueStatusPhonePacket();
         releaseMqttClientProxyPhonePacket();
@@ -62,15 +75,17 @@ void PhoneAPI::close()
     }
 }
 
-void PhoneAPI::checkConnectionTimeout()
+bool PhoneAPI::checkConnectionTimeout()
 {
     if (isConnected()) {
         bool newContact = checkIsConnected();
         if (!newContact) {
             LOG_INFO("Lost phone connection\n");
             close();
+            return true;
         }
     }
+    return false;
 }
 
 /**
@@ -99,13 +114,24 @@ bool PhoneAPI::handleToRadio(const uint8_t *buf, size_t bufLength)
             break;
         case meshtastic_ToRadio_xmodemPacket_tag:
             LOG_INFO("Got xmodem packet\n");
+#ifdef FSCom
             xModem.handlePacket(toRadioScratch.xmodemPacket);
+#endif
             break;
+#if !MESHTASTIC_EXCLUDE_MQTT
         case meshtastic_ToRadio_mqttClientProxyMessage_tag:
             LOG_INFO("Got MqttClientProxy message\n");
-            if (mqtt && moduleConfig.mqtt.proxy_to_client_enabled) {
+            if (mqtt && moduleConfig.mqtt.proxy_to_client_enabled && moduleConfig.mqtt.enabled &&
+                (channels.anyMqttEnabled() || moduleConfig.mqtt.map_reporting_enabled)) {
                 mqtt->onClientProxyReceive(toRadioScratch.mqttClientProxyMessage);
+            } else {
+                LOG_WARN("MqttClientProxy received but proxy is not enabled, no channels have up/downlink, or map reporting "
+                         "not enabled\n");
             }
+            break;
+#endif
+        case meshtastic_ToRadio_heartbeat_tag:
+            LOG_DEBUG("Got client heartbeat\n");
             break;
         default:
             // Ignore nop messages
@@ -124,16 +150,19 @@ bool PhoneAPI::handleToRadio(const uint8_t *buf, size_t bufLength)
  *
  * We assume buf is at least FromRadio_size bytes long.
  *
- * Our sending states progress in the following sequence (the client app ASSUMES THIS SEQUENCE, DO NOT CHANGE IT):
- *      STATE_SEND_MY_INFO, // send our my info record
- *      STATE_SEND_CHANNELS
- *      STATE_SEND_NODEINFO, // states progress in this order as the device sends to the client
-        STATE_SEND_CONFIG,
-        STATE_SEND_MODULE_CONFIG,
-        STATE_SEND_METADATA,
-        STATE_SEND_COMPLETE_ID,
-        STATE_SEND_PACKETS // send packets or debug strings
+ * Our sending states progress in the following sequence (the client apps ASSUME THIS SEQUENCE, DO NOT CHANGE IT):
+    STATE_SEND_MY_INFO, // send our my info record
+    STATE_SEND_OWN_NODEINFO,
+    STATE_SEND_METADATA,
+    STATE_SEND_CHANNELS
+    STATE_SEND_CONFIG,
+    STATE_SEND_MODULE_CONFIG,
+    STATE_SEND_OTHER_NODEINFOS, // states progress in this order as the device sends to the client
+    STATE_SEND_FILEMANIFEST,
+    STATE_SEND_COMPLETE_ID,
+    STATE_SEND_PACKETS // send packets or debug strings
  */
+
 size_t PhoneAPI::getFromRadio(uint8_t *buf)
 {
     if (!available()) {
@@ -155,29 +184,31 @@ size_t PhoneAPI::getFromRadio(uint8_t *buf)
         // app not to send locations on our behalf.
         fromRadioScratch.which_payload_variant = meshtastic_FromRadio_my_info_tag;
         fromRadioScratch.my_info = myNodeInfo;
-        state = STATE_SEND_NODEINFO;
+        state = STATE_SEND_OWN_NODEINFO;
 
         service.refreshLocalMeshNode(); // Update my NodeInfo because the client will be asking for it soon.
         break;
 
-    case STATE_SEND_NODEINFO: {
-        LOG_INFO("getFromRadio=STATE_SEND_NODEINFO\n");
-
-        if (nodeInfoForPhone.num != 0) {
-            LOG_INFO("nodeinfo: num=0x%x, lastseen=%u, id=%s, name=%s\n", nodeInfoForPhone.num, nodeInfoForPhone.last_heard,
-                     nodeInfoForPhone.user.id, nodeInfoForPhone.user.long_name);
+    case STATE_SEND_OWN_NODEINFO: {
+        LOG_INFO("getFromRadio=STATE_SEND_OWN_NODEINFO\n");
+        auto us = nodeDB->readNextMeshNode(readIndex);
+        if (us) {
+            nodeInfoForPhone = TypeConversions::ConvertToNodeInfo(us);
             fromRadioScratch.which_payload_variant = meshtastic_FromRadio_node_info_tag;
             fromRadioScratch.node_info = nodeInfoForPhone;
-            // Stay in current state until done sending nodeinfos
-            nodeInfoForPhone.num = 0; // We just consumed a nodeinfo, will need a new one next time
-        } else {
-            LOG_INFO("Done sending nodeinfos\n");
-            state = STATE_SEND_CHANNELS;
-            // Go ahead and send that ID right now
-            return getFromRadio(buf);
+            // Should allow us to resume sending NodeInfo in STATE_SEND_OTHER_NODEINFOS
+            nodeInfoForPhone.num = 0;
         }
+        state = STATE_SEND_METADATA;
         break;
     }
+
+    case STATE_SEND_METADATA:
+        LOG_INFO("getFromRadio=STATE_SEND_METADATA\n");
+        fromRadioScratch.which_payload_variant = meshtastic_FromRadio_metadata_tag;
+        fromRadioScratch.metadata = getDeviceMetadata();
+        state = STATE_SEND_CHANNELS;
+        break;
 
     case STATE_SEND_CHANNELS:
         LOG_INFO("getFromRadio=STATE_SEND_CHANNELS\n");
@@ -287,6 +318,14 @@ size_t PhoneAPI::getFromRadio(uint8_t *buf)
             fromRadioScratch.moduleConfig.which_payload_variant = meshtastic_ModuleConfig_detection_sensor_tag;
             fromRadioScratch.moduleConfig.payload_variant.detection_sensor = moduleConfig.detection_sensor;
             break;
+        case meshtastic_ModuleConfig_ambient_lighting_tag:
+            fromRadioScratch.moduleConfig.which_payload_variant = meshtastic_ModuleConfig_ambient_lighting_tag;
+            fromRadioScratch.moduleConfig.payload_variant.ambient_lighting = moduleConfig.ambient_lighting;
+            break;
+        case meshtastic_ModuleConfig_paxcounter_tag:
+            fromRadioScratch.moduleConfig.which_payload_variant = meshtastic_ModuleConfig_paxcounter_tag;
+            fromRadioScratch.moduleConfig.payload_variant.paxcounter = moduleConfig.paxcounter;
+            break;
         default:
             LOG_ERROR("Unknown module config type %d\n", config_state);
         }
@@ -294,24 +333,53 @@ size_t PhoneAPI::getFromRadio(uint8_t *buf)
         config_state++;
         // Advance when we have sent all of our ModuleConfig objects
         if (config_state > (_meshtastic_AdminMessage_ModuleConfigType_MAX + 1)) {
-            state = STATE_SEND_METADATA;
+            // Clients sending special nonce don't want to see other nodeinfos
+            state = config_nonce == SPECIAL_NONCE ? STATE_SEND_FILEMANIFEST : STATE_SEND_OTHER_NODEINFOS;
             config_state = 0;
         }
         break;
-    case STATE_SEND_METADATA:
-        fromRadioScratch.which_payload_variant = meshtastic_FromRadio_metadata_tag;
-        fromRadioScratch.metadata = getDeviceMetadata();
-        state = STATE_SEND_COMPLETE_ID;
+
+    case STATE_SEND_OTHER_NODEINFOS: {
+        LOG_INFO("getFromRadio=STATE_SEND_OTHER_NODEINFOS\n");
+        if (nodeInfoForPhone.num != 0) {
+            LOG_INFO("nodeinfo: num=0x%x, lastseen=%u, id=%s, name=%s\n", nodeInfoForPhone.num, nodeInfoForPhone.last_heard,
+                     nodeInfoForPhone.user.id, nodeInfoForPhone.user.long_name);
+            fromRadioScratch.which_payload_variant = meshtastic_FromRadio_node_info_tag;
+            fromRadioScratch.node_info = nodeInfoForPhone;
+            // Stay in current state until done sending nodeinfos
+            nodeInfoForPhone.num = 0; // We just consumed a nodeinfo, will need a new one next time
+        } else {
+            LOG_INFO("Done sending nodeinfos\n");
+            state = STATE_SEND_FILEMANIFEST;
+            // Go ahead and send that ID right now
+            return getFromRadio(buf);
+        }
         break;
+    }
+
+    case STATE_SEND_FILEMANIFEST: {
+        LOG_INFO("getFromRadio=STATE_SEND_FILEMANIFEST\n");
+        // last element
+        if (config_state == filesManifest.size()) { // also handles an empty filesManifest
+            config_state = 0;
+            filesManifest.clear();
+            // Skip to complete packet
+            sendConfigComplete();
+        } else {
+            fromRadioScratch.which_payload_variant = meshtastic_FromRadio_fileInfo_tag;
+            fromRadioScratch.fileInfo = filesManifest.at(config_state);
+            LOG_DEBUG("File: %s (%d) bytes\n", fromRadioScratch.fileInfo.file_name, fromRadioScratch.fileInfo.size_bytes);
+            config_state++;
+        }
+        break;
+    }
+
     case STATE_SEND_COMPLETE_ID:
-        LOG_INFO("getFromRadio=STATE_SEND_COMPLETE_ID\n");
-        fromRadioScratch.which_payload_variant = meshtastic_FromRadio_config_complete_id_tag;
-        fromRadioScratch.config_complete_id = config_nonce;
-        config_nonce = 0;
-        state = STATE_SEND_PACKETS;
+        sendConfigComplete();
         break;
 
     case STATE_SEND_PACKETS:
+        pauseBluetoothLogging = false;
         // Do we have a message from the mesh or packet from the local device?
         LOG_INFO("getFromRadio=STATE_SEND_PACKETS\n");
         if (queueStatusPacketForPhone) {
@@ -345,7 +413,9 @@ size_t PhoneAPI::getFromRadio(uint8_t *buf)
         // Encapsulate as a FromRadio packet
         size_t numbytes = pb_encode_to_bytes(buf, meshtastic_FromRadio_size, &meshtastic_FromRadio_msg, &fromRadioScratch);
 
-        LOG_DEBUG("encoding toPhone packet to phone variant=%d, %d bytes\n", fromRadioScratch.which_payload_variant, numbytes);
+        // VERY IMPORTANT to not print debug messages while writing to fromRadioScratch - because we use that same buffer
+        // for logging (when we are encapsulating with protobufs)
+        // LOG_DEBUG("encoding toPhone packet to phone variant=%d, %d bytes\n", fromRadioScratch.which_payload_variant, numbytes);
         return numbytes;
     }
 
@@ -353,8 +423,20 @@ size_t PhoneAPI::getFromRadio(uint8_t *buf)
     return 0;
 }
 
+void PhoneAPI::sendConfigComplete()
+{
+    LOG_INFO("getFromRadio=STATE_SEND_COMPLETE_ID\n");
+    fromRadioScratch.which_payload_variant = meshtastic_FromRadio_config_complete_id_tag;
+    fromRadioScratch.config_complete_id = config_nonce;
+    config_nonce = 0;
+    state = STATE_SEND_PACKETS;
+    pauseBluetoothLogging = false;
+}
+
 void PhoneAPI::handleDisconnect()
 {
+    filesManifest.clear();
+    pauseBluetoothLogging = false;
     LOG_INFO("PhoneAPI disconnect\n");
 }
 
@@ -395,18 +477,22 @@ bool PhoneAPI::available()
     case STATE_SEND_CONFIG:
     case STATE_SEND_MODULECONFIG:
     case STATE_SEND_METADATA:
+    case STATE_SEND_OWN_NODEINFO:
+    case STATE_SEND_FILEMANIFEST:
     case STATE_SEND_COMPLETE_ID:
         return true;
 
-    case STATE_SEND_NODEINFO:
+    case STATE_SEND_OTHER_NODEINFOS:
         if (nodeInfoForPhone.num == 0) {
-            auto nextNode = nodeDB.readNextMeshNode(readIndex);
+            auto nextNode = nodeDB->readNextMeshNode(readIndex);
             if (nextNode) {
-                nodeInfoForPhone = ConvertToNodeInfo(nextNode);
+                nodeInfoForPhone = TypeConversions::ConvertToNodeInfo(nextNode);
+                nodeInfoForPhone.hops_away = nodeInfoForPhone.num == nodeDB->getNodeNum() ? 0 : nodeInfoForPhone.hops_away;
+                nodeInfoForPhone.is_favorite =
+                    nodeInfoForPhone.is_favorite || nodeInfoForPhone.num == nodeDB->getNodeNum(); // Our node is always a favorite
             }
         }
         return true; // Always say we have something, because we might need to advance our state machine
-
     case STATE_SEND_PACKETS: {
         if (!queueStatusPacketForPhone)
             queueStatusPacketForPhone = service.getQueueStatusForPhone();
@@ -416,12 +502,22 @@ bool PhoneAPI::available()
         if (hasPacket)
             return true;
 
+#ifdef FSCom
         if (xmodemPacketForPhone.control == meshtastic_XModem_Control_NUL)
             xmodemPacketForPhone = xModem.getForPhone();
         if (xmodemPacketForPhone.control != meshtastic_XModem_Control_NUL) {
             xModem.resetForPhone();
             return true;
         }
+#endif
+
+#ifdef ARCH_ESP32
+#if !MESHTASTIC_EXCLUDE_STOREFORWARD
+        // Check if StoreForward has packets stored for us.
+        if (!packetForPhone && storeForwardModule)
+            packetForPhone = storeForwardModule->getForPhone();
+#endif
+#endif
 
         if (!packetForPhone)
             packetForPhone = service.getForPhone();
@@ -450,8 +546,8 @@ bool PhoneAPI::handleToRadioPacket(meshtastic_MeshPacket &p)
 /// If the mesh service tells us fromNum has changed, tell the phone
 int PhoneAPI::onNotify(uint32_t newValue)
 {
-    checkConnectionTimeout(); // a handy place to check if we've heard from the phone (since the BLE version doesn't call this
-                              // from idle)
+    bool timeout = checkConnectionTimeout(); // a handy place to check if we've heard from the phone (since the BLE version
+                                             // doesn't call this from idle)
 
     if (state == STATE_SEND_PACKETS) {
         LOG_INFO("Telling client we have new packets %u\n", newValue);
@@ -460,5 +556,5 @@ int PhoneAPI::onNotify(uint32_t newValue)
         LOG_DEBUG("(Client not yet interested in packets)\n");
     }
 
-    return 0;
+    return timeout ? -1 : 0; // If we timed out, MeshService should stop iterating through observers as we just removed one
 }

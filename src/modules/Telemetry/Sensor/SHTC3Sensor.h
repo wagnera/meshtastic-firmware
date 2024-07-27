@@ -1,8 +1,12 @@
+#include "configuration.h"
+
+#if !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
+
 #include "../mesh/generated/meshtastic/telemetry.pb.h"
 #include "TelemetrySensor.h"
 #include <Adafruit_SHTC3.h>
 
-class SHTC3Sensor : virtual public TelemetrySensor
+class SHTC3Sensor : public TelemetrySensor
 {
   private:
     Adafruit_SHTC3 shtc3 = Adafruit_SHTC3();
@@ -15,3 +19,5 @@ class SHTC3Sensor : virtual public TelemetrySensor
     virtual int32_t runOnce() override;
     virtual bool getMetrics(meshtastic_Telemetry *measurement) override;
 };
+
+#endif

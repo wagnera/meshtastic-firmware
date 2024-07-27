@@ -1,13 +1,13 @@
 #pragma once
 #include "ProtobufModule.h"
-#ifdef ARCH_ESP32
-#include "mesh/http/WiFiAPClient.h"
+#if HAS_WIFI
+#include "mesh/wifi/WiFiAPClient.h"
 #endif
 
 /**
  * Admin module for admin messages
  */
-class AdminModule : public ProtobufModule<meshtastic_AdminMessage>
+class AdminModule : public ProtobufModule<meshtastic_AdminMessage>, public Observable<const meshtastic_AdminMessage *>
 {
   public:
     /** Constructor

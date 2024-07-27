@@ -1,10 +1,3 @@
-#undef GPS_RX_PIN
-#undef GPS_TX_PIN
-#define GPS_RX_PIN 15 // per @der_bear on the forum, 36 is incorrect for this board type and 15 is a better pick
-#define GPS_TX_PIN 13
-
-#define PIN_GPS_EN 19 // GPS power enable pin
-
 #define BATTERY_PIN 35
 #define ADC_CHANNEL ADC1_GPIO35_CHANNEL
 #define BATTERY_SENSE_SAMPLES 30
@@ -23,5 +16,13 @@
 #define USE_RF95
 #define LORA_DIO0 26 // a No connect on the SX1262 module
 #define LORA_RESET 23
+
+// In the T3 V1.6.1 TXCO version, GPIO 33 is connected to Radio’s
+// internal temperature-compensated crystal oscillator enable
+#ifdef LORA_TCXO_GPIO
+#define LORA_DIO1 RADIOLIB_NC // no-connect on sx127x module
+#else
 #define LORA_DIO1 33 // https://www.thethingsnetwork.org/forum/t/big-esp32-sx127x-topic-part-3/18436
+#endif
+
 #define LORA_DIO2 32 // Not really used

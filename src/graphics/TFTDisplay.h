@@ -20,7 +20,8 @@ class TFTDisplay : public OLEDDisplay
     TFTDisplay(uint8_t, int, int, OLEDDISPLAY_GEOMETRY, HW_I2C);
 
     // Write the buffer to the display memory
-    virtual void display(void) override;
+    virtual void display() override { display(false); };
+    virtual void display(bool fromBlank);
 
     // Turn the display upside down
     virtual void flipScreenVertically();
@@ -28,6 +29,9 @@ class TFTDisplay : public OLEDDisplay
     // Touch screen (static handlers)
     static bool hasTouch(void);
     static bool getTouch(int16_t *x, int16_t *y);
+
+    // Functions for changing display brightness
+    void setDisplayBrightness(uint8_t);
 
     /**
      * shim to make the abstraction happy

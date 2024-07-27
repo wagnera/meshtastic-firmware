@@ -1,10 +1,10 @@
 #include "DetectionSensorModule.h"
+#include "Default.h"
 #include "MeshService.h"
 #include "NodeDB.h"
 #include "PowerFSM.h"
 #include "configuration.h"
 #include "main.h"
-
 DetectionSensorModule *detectionSensorModule;
 
 #define GPIO_POLLING_INTERVAL 100
@@ -28,6 +28,12 @@ int32_t DetectionSensorModule::runOnce()
         return disable();
 
     if (firstTime) {
+
+#ifdef DETECTION_SENSOR_EN
+        pinMode(DETECTION_SENSOR_EN, OUTPUT);
+        digitalWrite(DETECTION_SENSOR_EN, HIGH);
+#endif
+
         // This is the first time the OSThread library has called this function, so do some setup
         firstTime = false;
         if (moduleConfig.detection_sensor.monitor_pin > 0) {
@@ -43,7 +49,7 @@ int32_t DetectionSensorModule::runOnce()
 
     // LOG_DEBUG("Detection Sensor Module: Current pin state: %i\n", digitalRead(moduleConfig.detection_sensor.monitor_pin));
 
-    if ((millis() - lastSentToMesh) >= getConfiguredOrDefaultMs(moduleConfig.detection_sensor.minimum_broadcast_secs) &&
+    if ((millis() - lastSentToMesh) >= Default::getConfiguredOrDefaultMs(moduleConfig.detection_sensor.minimum_broadcast_secs) &&
         hasDetectionEvent()) {
         sendDetectionMessage();
         return DELAYED_INTERVAL;
@@ -52,7 +58,8 @@ int32_t DetectionSensorModule::runOnce()
     // of heartbeat. We only do this if the minimum broadcast interval is greater than zero, otherwise we'll only broadcast state
     // change detections.
     else if (moduleConfig.detection_sensor.state_broadcast_secs > 0 &&
-             (millis() - lastSentToMesh) >= getConfiguredOrDefaultMs(moduleConfig.detection_sensor.state_broadcast_secs)) {
+             (millis() - lastSentToMesh) >= Default::getConfiguredOrDefaultMs(moduleConfig.detection_sensor.state_broadcast_secs,
+                                                                              default_telemetry_broadcast_interval_secs)) {
         sendCurrentStateMessage();
         return DELAYED_INTERVAL;
     }

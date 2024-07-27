@@ -1,7 +1,10 @@
-#include "BME280Sensor.h"
-#include "../mesh/generated/meshtastic/telemetry.pb.h"
-#include "TelemetrySensor.h"
 #include "configuration.h"
+
+#if !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
+
+#include "../mesh/generated/meshtastic/telemetry.pb.h"
+#include "BME280Sensor.h"
+#include "TelemetrySensor.h"
 #include <Adafruit_BME280.h>
 #include <typeinfo>
 
@@ -13,7 +16,7 @@ int32_t BME280Sensor::runOnce()
     if (!hasSensor()) {
         return DEFAULT_SENSOR_MINIMUM_WAIT_TIME_BETWEEN_READS;
     }
-    status = bme280.begin(nodeTelemetrySensorsMap[sensorType]);
+    status = bme280.begin(nodeTelemetrySensorsMap[sensorType].first, nodeTelemetrySensorsMap[sensorType].second);
 
     bme280.setSampling(Adafruit_BME280::MODE_FORCED,
                        Adafruit_BME280::SAMPLING_X1, // Temp. oversampling
@@ -36,3 +39,4 @@ bool BME280Sensor::getMetrics(meshtastic_Telemetry *measurement)
 
     return true;
 }
+#endif

@@ -13,6 +13,7 @@ template <class T> class ProtobufModule : protected SinglePortModule
     const pb_msgdesc_t *fields;
 
   public:
+    uint8_t numOnlineNodes = 0;
     /** Constructor
      * name is for debugging output
      */
@@ -29,6 +30,10 @@ template <class T> class ProtobufModule : protected SinglePortModule
      * for multiple port numbers, decoding will ONLY be attempted for packets where the portnum matches our expected ourPortNum.
      */
     virtual bool handleReceivedProtobuf(const meshtastic_MeshPacket &mp, T *decoded) = 0;
+
+    /** Called to make changes to a particular incoming message
+     */
+    virtual void alterReceivedProtobuf(meshtastic_MeshPacket &mp, T *decoded){};
 
     /**
      * Return a mesh packet which has been preinited with a particular protobuf data payload and port number.
@@ -52,9 +57,17 @@ template <class T> class ProtobufModule : protected SinglePortModule
      */
     const char *getSenderShortName(const meshtastic_MeshPacket &mp)
     {
-        auto node = nodeDB.getMeshNode(getFrom(&mp));
+        auto node = nodeDB->getMeshNode(getFrom(&mp));
         const char *sender = (node) ? node->user.short_name : "???";
         return sender;
+    }
+
+    int handleStatusUpdate(const meshtastic::Status *arg)
+    {
+        if (arg->getStatusType() == STATUS_TYPE_NODE) {
+            numOnlineNodes = nodeStatus->getNumOnline();
+        }
+        return 0;
     }
 
   private:
@@ -85,5 +98,26 @@ template <class T> class ProtobufModule : protected SinglePortModule
         }
 
         return handleReceivedProtobuf(mp, decoded) ? ProcessMessage::STOP : ProcessMessage::CONTINUE;
+    }
+
+    /** Called to alter a particular incoming message
+     */
+    virtual void alterReceived(meshtastic_MeshPacket &mp) override
+    {
+        T scratch;
+        T *decoded = NULL;
+        if (mp.which_payload_variant == meshtastic_MeshPacket_decoded_tag && mp.decoded.portnum == ourPortNum) {
+            memset(&scratch, 0, sizeof(scratch));
+            auto &p = mp.decoded;
+            if (pb_decode_from_bytes(p.payload.bytes, p.payload.size, fields, &scratch)) {
+                decoded = &scratch;
+            } else {
+                LOG_ERROR("Error decoding protobuf module!\n");
+                // if we can't decode it, nobody can process it!
+                return;
+            }
+
+            return alterReceivedProtobuf(mp, decoded);
+        }
     }
 };

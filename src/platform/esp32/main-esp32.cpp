@@ -3,11 +3,14 @@
 #include "esp_task_wdt.h"
 #include "main.h"
 
-#if !defined(CONFIG_IDF_TARGET_ESP32S2)
+#if !defined(CONFIG_IDF_TARGET_ESP32S2) && !MESHTASTIC_EXCLUDE_BLUETOOTH
+#include "BleOta.h"
 #include "nimble/NimbleBluetooth.h"
 #endif
-#include "BleOta.h"
-#include "mesh/http/WiFiAPClient.h"
+
+#if HAS_WIFI
+#include "mesh/wifi/WiFiAPClient.h"
+#endif
 
 #include "meshUtils.h"
 #include "sleep.h"
@@ -18,23 +21,28 @@
 #include <nvs.h>
 #include <nvs_flash.h>
 
-#if !defined(CONFIG_IDF_TARGET_ESP32S2)
-
-void setBluetoothEnable(bool on)
+#if !defined(CONFIG_IDF_TARGET_ESP32S2) && !MESHTASTIC_EXCLUDE_BLUETOOTH
+void setBluetoothEnable(bool enable)
 {
-    if (!isWifiAvailable() && config.bluetooth.enabled == true) {
+#if HAS_WIFI
+    if (!isWifiAvailable() && config.bluetooth.enabled == true)
+#else
+    if (config.bluetooth.enabled == true)
+#endif
+    {
         if (!nimbleBluetooth) {
             nimbleBluetooth = new NimbleBluetooth();
         }
-        if (on && !nimbleBluetooth->isActive()) {
+        if (enable && !nimbleBluetooth->isActive()) {
             nimbleBluetooth->setup();
-        } else if (!on) {
-            nimbleBluetooth->shutdown();
         }
+        // For ESP32, no way to recover from bluetooth shutdown without reboot
+        // BLE advertising automatically stops when MCU enters light-sleep(?)
+        // For deep-sleep, shutdown hardware with nimbleBluetooth->deinit(). Requires reboot to reverse
     }
 }
 #else
-void setBluetoothEnable(bool on) {}
+void setBluetoothEnable(bool enable) {}
 void updateBatteryLevel(uint8_t level) {}
 #endif
 
@@ -83,8 +91,12 @@ void enableSlowCLK()
 
 void esp32Setup()
 {
+    /* We explicitly don't want to do call randomSeed,
+    // as that triggers the esp32 core to use a less secure pseudorandom function.
     uint32_t seed = esp_random();
     LOG_DEBUG("Setting random seed %u\n", seed);
+    randomSeed(seed);
+    */
 
     LOG_DEBUG("Total heap: %d\n", ESP.getHeapSize());
     LOG_DEBUG("Free heap: %d\n", ESP.getFreeHeap());
@@ -108,12 +120,16 @@ void esp32Setup()
     preferences.putUInt("rebootCounter", rebootCounter);
     preferences.end();
     LOG_DEBUG("Number of Device Reboots: %d\n", rebootCounter);
+#if !MESHTASTIC_EXCLUDE_BLUETOOTH
     String BLEOTA = BleOta::getOtaAppVersion();
     if (BLEOTA.isEmpty()) {
         LOG_DEBUG("No OTA firmware available\n");
     } else {
         LOG_DEBUG("OTA firmware version %s\n", BLEOTA.c_str());
     }
+#else
+    LOG_DEBUG("No OTA firmware available\n");
+#endif
 
     // enableModemSleep();
 
@@ -175,7 +191,8 @@ void cpuDeepSleep(uint32_t msecToWake)
     some current will flow through these external and internal resistors, increasing deep
     sleep current above the minimal possible value.
 
-    Note: we don't isolate pins that are used for the LORA, LED, i2c, spi or the wake button
+    Note: we don't isolate pins that are used for the LORA, LED, i2c, or ST7735 Display for the Chatter2, spi or the wake
+    button(s), maybe we should not include any other GPIOs...
     */
 #if SOC_RTCIO_HOLD_SUPPORTED
     static const uint8_t rtcGpios[] = {/* 0, */ 2,
@@ -184,25 +201,21 @@ void cpuDeepSleep(uint32_t msecToWake)
                                        13,
     /* 14, */ /* 15, */
 #endif
-                                       /* 25, */ 26, /* 27, */
-                                       32,           33, 34, 35,
-                                       36,           37
+                                       /* 25, */ /* 26, */ /* 27, */
+                                       /* 32, */ /* 33, */ 34, 35,
+                                       /* 36, */ 37
                                        /* 38, 39 */};
 
     for (int i = 0; i < sizeof(rtcGpios); i++)
         rtc_gpio_isolate((gpio_num_t)rtcGpios[i]);
 #endif
 
-    // FIXME, disable internal rtc pullups/pulldowns on the non isolated pins. for inputs that we aren't using
-    // to detect wake and in normal operation the external part drives them hard.
-
-    // We want RTC peripherals to stay on
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
-
+        // FIXME, disable internal rtc pullups/pulldowns on the non isolated pins. for inputs that we aren't using
+        // to detect wake and in normal operation the external part drives them hard.
 #ifdef BUTTON_PIN
-    // Only GPIOs which are have RTC functionality can be used in this bit map: 0,2,4,12-15,25-27,32-39.
+        // Only GPIOs which are have RTC functionality can be used in this bit map: 0,2,4,12-15,25-27,32-39.
 #if SOC_RTCIO_HOLD_SUPPORTED
-    uint64_t gpioMask = (1ULL << config.device.button_gpio ? config.device.button_gpio : BUTTON_PIN);
+    uint64_t gpioMask = (1ULL << (config.device.button_gpio ? config.device.button_gpio : BUTTON_PIN));
 #endif
 
 #ifdef BUTTON_NEED_PULLUP
@@ -210,13 +223,21 @@ void cpuDeepSleep(uint32_t msecToWake)
 #endif
 
     // Not needed because both of the current boards have external pullups
-    // FIXME change polarity in hw so we can wake on ANY_HIGH instead - that would allow us to use all three buttons (instead of
-    // just the first) gpio_pullup_en((gpio_num_t)BUTTON_PIN);
+    // FIXME change polarity in hw so we can wake on ANY_HIGH instead - that would allow us to use all three buttons (instead
+    // of just the first) gpio_pullup_en((gpio_num_t)BUTTON_PIN);
 
 #if SOC_PM_SUPPORT_EXT_WAKEUP
+#ifdef CONFIG_IDF_TARGET_ESP32
+    // ESP_EXT1_WAKEUP_ALL_LOW has been deprecated since esp-idf v5.4 for any other target.
     esp_sleep_enable_ext1_wakeup(gpioMask, ESP_EXT1_WAKEUP_ALL_LOW);
+#else
+    esp_sleep_enable_ext1_wakeup(gpioMask, ESP_EXT1_WAKEUP_ANY_LOW);
 #endif
 #endif
+#endif
+
+    // We want RTC peripherals to stay on
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 
     esp_sleep_enable_timer_wakeup(msecToWake * 1000ULL); // call expects usecs
     esp_deep_sleep_start();                              // TBD mA sleep current (battery)

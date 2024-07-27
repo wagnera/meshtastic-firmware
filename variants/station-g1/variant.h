@@ -23,13 +23,11 @@
 #define LORA_DIO3    // Not connected on PCB
 
 #ifdef USE_SX1262
-#define SX126X_CS RF95_NSS // FIXME - we really should define LORA_CS instead
+#define SX126X_CS LORA_CS // FIXME - we really should define LORA_CS instead
 #define SX126X_DIO1 LORA_DIO1
 #define SX126X_BUSY LORA_DIO2
 #define SX126X_RESET LORA_RESET
-// #define SX126X_E22 // Not really an E22
-//  Internally the module hooks the SX1262-DIO2 in to control the TX/RX switch (which is the default for the sx1262interface
-//  code)
+#define SX126X_DIO2_AS_RF_SWITCH // Internally the module hooks the SX1262-DIO2 in to control the TX/RX switch
 #define SX126X_MAX_POWER                                                                                                         \
     16 // Ensure the PA does not exceed the saturation output power. More
        // Info:https://uniteng.com/wiki/doku.php?id=meshtastic:station#rf_design_-_lora_station_edition_g1
@@ -39,10 +37,8 @@
 #define ADC_CHANNEL ADC1_GPIO35_CHANNEL
 #define BATTERY_SENSE_SAMPLES 30 // Set the number of samples, It has an effect of increasing sensitivity.
 #define ADC_MULTIPLIER 6.45
-#define BAT_FULLVOLT 12600
-#define BAT_EMPTYVOLT 8200
-#define BAT_CHARGINGVOLT 12600
-#define BAT_NOBATVOLT 6690
+#define CELL_TYPE_LION // same curve for liion/lipo
+#define NUM_CELLS 3
 
 // different screen
 #define USE_SH1106
