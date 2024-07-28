@@ -361,7 +361,7 @@ ProcessMessage LedMatrixModule::handleReceived(const meshtastic_MeshPacket &mp)
             }
             current_text = text_messages[msg_index];
             current_text_length = text_sizes[msg_index];
-            if (msg_index == 9)
+            if (msg_index == 10)
             {
                 current_color = matrix.Color(226, 46, 43); // For gate warning
             }
