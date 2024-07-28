@@ -84,10 +84,11 @@ bool PositionModule::handleReceivedProtobuf(const meshtastic_MeshPacket &mp, mes
     if (p.time && channels.getByIndex(mp.channel).role == meshtastic_Channel_Role_PRIMARY) {
         bool force = false;
 
-    L:OG_DEBUG("Time is %ld", secs);
+    uint32_t secs = p.time;
+    LOG_DEBUG("Time is %ld", secs);
 
-    tv.tv_sec = secs;
-    tv.tv_usec = 0;
+    // tv.tv_sec = secs;
+    // tv.tv_usec = 0;
 
 #ifdef T_WATCH_S3
         // The T-Watch appears to "pause" its RTC when shut down, such that the time it reads upon powering on is the same as when
