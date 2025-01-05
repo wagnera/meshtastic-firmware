@@ -109,13 +109,12 @@ int32_t SerialModule::runOnce()
         without having to configure it from the PythonAPI or WebUI.
     */
 
-    moduleConfig.serial.enabled = true;
-    moduleConfig.serial.rxd = 19;
-    moduleConfig.serial.txd = 20;
-    moduleConfig.serial.override_console_serial_port = false;
-    moduleConfig.serial.mode = meshtastic_ModuleConfig_SerialConfig_Serial_Mode_SIMPLE;
-    moduleConfig.serial.timeout = 100;
-    moduleConfig.serial.baud = meshtastic_ModuleConfig_SerialConfig_Serial_Baud_BAUD_38400;
+    // moduleConfig.serial.enabled = true;
+    // moduleConfig.serial.rxd = 35;
+    // moduleConfig.serial.txd = 15;
+    // moduleConfig.serial.override_console_serial_port = true;
+    // moduleConfig.serial.mode = meshtastic_ModuleConfig_SerialConfig_Serial_Mode_CALTOPO;
+    // moduleConfig.serial.timeout = 1000;
     // moduleConfig.serial.echo = 1;
 
     if (!moduleConfig.serial.enabled)
