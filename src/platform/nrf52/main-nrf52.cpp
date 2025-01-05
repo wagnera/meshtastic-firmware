@@ -9,8 +9,10 @@
 #include <stdio.h>
 // #include <Adafruit_USBD_Device.h>
 #include "NodeDB.h"
+#include "PowerMon.h"
 #include "error.h"
 #include "main.h"
+#include "meshUtils.h"
 
 #ifdef BQ25703A_ADDR
 #include "BQ25713.h"
@@ -33,7 +35,7 @@ bool loopCanSleep()
 // handle standard gcc assert failures
 void __attribute__((noreturn)) __assert_func(const char *file, int line, const char *func, const char *failedexpr)
 {
-    LOG_ERROR("assert failed %s: %d, %s, test=%s\n", file, line, func, failedexpr);
+    LOG_ERROR("assert failed %s: %d, %s, test=%s", file, line, func, failedexpr);
     // debugger_break(); FIXME doesn't work, possibly not for segger
     // Reboot cpu
     NVIC_SystemReset();
@@ -72,7 +74,7 @@ void setBluetoothEnable(bool enable)
     // For debugging use: don't use bluetooth
     if (!useSoftDevice) {
         if (enable)
-            LOG_INFO("DISABLING NRF52 BLUETOOTH WHILE DEBUGGING\n");
+            LOG_INFO("Disable NRF52 BLUETOOTH WHILE DEBUGGING");
         return;
     }
 
@@ -91,9 +93,11 @@ void setBluetoothEnable(bool enable)
     }
 
     if (enable) {
+        powerMon->setState(meshtastic_PowerMon_State_BT_On);
+
         // If not yet set-up
         if (!nrf52Bluetooth) {
-            LOG_DEBUG("Initializing NRF52 Bluetooth\n");
+            LOG_DEBUG("Init NRF52 Bluetooth");
             nrf52Bluetooth = new NRF52Bluetooth();
             nrf52Bluetooth->setup();
 
@@ -105,8 +109,10 @@ void setBluetoothEnable(bool enable)
             nrf52Bluetooth->resumeAdvertising();
     }
     // Disable (if previously set-up)
-    else if (nrf52Bluetooth)
+    else if (nrf52Bluetooth) {
+        powerMon->clearState(meshtastic_PowerMon_State_BT_On);
         nrf52Bluetooth->shutdown();
+    }
 }
 #else
 #warning NRF52 "Bluetooth disable" workaround does not apply to builds with MESHTASTIC_EXCLUDE_BLUETOOTH
@@ -135,7 +141,7 @@ void checkSDEvents()
                 break;
 
             default:
-                LOG_DEBUG("Unexpected SDevt %d\n", evt);
+                LOG_DEBUG("Unexpected SDevt %d", evt);
                 break;
             }
         }
@@ -152,6 +158,7 @@ void nrf52Loop()
 
 #ifdef USE_SEMIHOSTING
 #include <SemihostingStream.h>
+#include <meshUtils.h>
 
 /**
  * Note: this variable is in BSS and therfore false by default.  But the gdbinit
@@ -181,7 +188,7 @@ void nrf52Setup()
     uint32_t why = NRF_POWER->RESETREAS;
     // per
     // https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.nrf52832.ps.v1.1%2Fpower.html
-    LOG_DEBUG("Reset reason: 0x%x\n", why);
+    LOG_DEBUG("Reset reason: 0x%x", why);
 
 #ifdef USE_SEMIHOSTING
     nrf52InitSemiHosting();
@@ -195,7 +202,7 @@ void nrf52Setup()
 #ifdef BQ25703A_ADDR
     auto *bq = new BQ25713();
     if (!bq->setup())
-        LOG_ERROR("ERROR! Charge controller init failed\n");
+        LOG_ERROR("ERROR! Charge controller init failed");
 #endif
 
     // Init random seed
@@ -205,7 +212,7 @@ void nrf52Setup()
     } seed;
     nRFCrypto.begin();
     nRFCrypto.Random.generate(seed.seed8, sizeof(seed.seed8));
-    LOG_DEBUG("Setting random seed %u\n", seed.seed32);
+    LOG_DEBUG("Set random seed %u", seed.seed32);
     randomSeed(seed.seed32);
     nRFCrypto.end();
 }
@@ -247,23 +254,33 @@ void cpuDeepSleep(uint32_t msecToWake)
     nrf_gpio_cfg_default(WB_I2C1_SDA);
 #endif
 #endif
+
+#ifdef HELTEC_MESH_NODE_T114
+    nrf_gpio_cfg_default(PIN_GPS_PPS);
+    detachInterrupt(PIN_GPS_PPS);
+    detachInterrupt(PIN_BUTTON1);
+#endif
     // Sleepy trackers or sensors can low power "sleep"
     // Don't enter this if we're sleeping portMAX_DELAY, since that's a shutdown event
     if (msecToWake != portMAX_DELAY &&
-        (config.device.role == meshtastic_Config_DeviceConfig_Role_TRACKER ||
-         config.device.role == meshtastic_Config_DeviceConfig_Role_TAK_TRACKER ||
-         config.device.role == meshtastic_Config_DeviceConfig_Role_SENSOR) &&
-        config.power.is_power_saving == true) {
+        (IS_ONE_OF(config.device.role, meshtastic_Config_DeviceConfig_Role_TRACKER,
+                   meshtastic_Config_DeviceConfig_Role_TAK_TRACKER, meshtastic_Config_DeviceConfig_Role_SENSOR) &&
+         config.power.is_power_saving == true)) {
         sd_power_mode_set(NRF_POWER_MODE_LOWPWR);
         delay(msecToWake);
         NVIC_SystemReset();
     } else {
+        // Resume on user button press
+        // https://github.com/lyusupov/SoftRF/blob/81c519ca75693b696752235d559e881f2e0511ee/software/firmware/source/SoftRF/src/platform/nRF52.cpp#L1738
+        constexpr uint32_t DFU_MAGIC_SKIP = 0x6d;
+        sd_power_gpregret_set(0, DFU_MAGIC_SKIP); // Equivalent NRF_POWER->GPREGRET = DFU_MAGIC_SKIP
+
         // FIXME, use system off mode with ram retention for key state?
         // FIXME, use non-init RAM per
         // https://devzone.nordicsemi.com/f/nordic-q-a/48919/ram-retention-settings-with-softdevice-enabled
         auto ok = sd_power_system_off();
         if (ok != NRF_SUCCESS) {
-            LOG_ERROR("FIXME: Ignoring soft device (EasyDMA pending?) and forcing system-off!\n");
+            LOG_ERROR("FIXME: Ignoring soft device (EasyDMA pending?) and forcing system-off!");
             NRF_POWER->SYSTEMOFF = 1;
         }
     }
