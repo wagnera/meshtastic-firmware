@@ -48,9 +48,9 @@ bool MAX17048Singleton::isBatteryCharging()
         else if (chargeSamples.front().cellPercent < chargeSamples.back().cellPercent)
             chargeState = MAX17048ChargeState::IMPORT;
         else
-            chargeState = MAX17048ChargeState::IDLE;
+            chargeState = MAX17048ChargeState::IDLEE;
     } else {
-        chargeState = MAX17048ChargeState::IDLE;
+        chargeState = MAX17048ChargeState::IDLEE;
     }
 
     LOG_DEBUG("%s::isBatteryCharging %s volts: %.3f soc: %.3f rate: %.3f", sensorStr, chargeLabels[chargeState], volts,

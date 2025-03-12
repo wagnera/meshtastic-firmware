@@ -223,7 +223,6 @@ meshtastic_MeshPacket *PositionModule::allocReply()
     } else {
         p.location_source = localPosition.location_source;
     }
-    }
 
     if (pos_flags & meshtastic_Config_PositionConfig_PositionFlags_ALTITUDE) {
         if (pos_flags & meshtastic_Config_PositionConfig_PositionFlags_ALTITUDE_MSL) {

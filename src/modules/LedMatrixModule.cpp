@@ -243,7 +243,7 @@ int32_t LedMatrixModule::runOnce()
                 auto gate_msg = allocDataPacket();                 // Allocate a packet for sending
                 gate_msg->decoded.payload.size = strlen(gate_cmd_str); // You must specify how many bytes are in the reply
                 memcpy(gate_msg->decoded.payload.bytes, gate_cmd_str, gate_msg->decoded.payload.size);
-                service.sendToMesh(gate_msg);
+                service->sendToMesh(gate_msg);
             }
             else
             {

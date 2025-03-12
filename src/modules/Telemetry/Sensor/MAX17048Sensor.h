@@ -29,7 +29,7 @@ struct MAX17048ChargeSample {
     float chargeRate;
 };
 
-enum MAX17048ChargeState { IDLE, EXPORT, IMPORT };
+enum MAX17048ChargeState { IDLEE, EXPORT, IMPORT };
 
 // Singleton wrapper for the Adafruit_MAX17048 class
 class MAX17048Singleton : public Adafruit_MAX17048
@@ -38,7 +38,7 @@ class MAX17048Singleton : public Adafruit_MAX17048
     static MAX17048Singleton *pinstance;
     bool initialized = false;
     std::queue<MAX17048ChargeSample> chargeSamples;
-    MAX17048ChargeState chargeState = IDLE;
+    MAX17048ChargeState chargeState = IDLEE;
     const String chargeLabels[3] = {F("idle"), F("export"), F("import")};
     const char *sensorStr = "MAX17048Sensor";
 

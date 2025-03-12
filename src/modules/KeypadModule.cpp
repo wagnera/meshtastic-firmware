@@ -80,7 +80,7 @@ int32_t KeypadModule::runOnce()
                 r.gpio_value = (uint64_t)key;
                 // LOG_DEBUG("keypad gpio_value2: %u\n",(uint8_t)r.gpio_mask);
                 meshtastic_MeshPacket *p = allocDataProtobuf(r);
-                service.sendToMesh(p);
+                service->sendToMesh(p);
             }
             
         }
