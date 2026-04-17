@@ -1,6 +1,8 @@
 import configparser
 import subprocess
-
+import os
+run_number = os.getenv('GITHUB_RUN_NUMBER', '0')
+build_location = os.getenv('BUILD_LOCATION', 'local')
 
 def readProps(prefsLoc):
     """Read the version of our project as a string"""
@@ -11,12 +13,14 @@ def readProps(prefsLoc):
     verObj = dict(
         short="{}.{}.{}".format(version["major"], version["minor"], version["build"]),
         long="unset",
+        deb="unset",
     )
 
     # Try to find current build SHA if if the workspace is clean.  This could fail if git is not installed
     try:
+        # Pin abbreviation length to keep local builds and CI matching (avoid auto-shortening)
         sha = (
-            subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
+            subprocess.check_output(["git", "rev-parse", "--short=7", "HEAD"])
             .decode("utf-8")
             .strip()
         )
@@ -27,13 +31,13 @@ def readProps(prefsLoc):
         # if isDirty:
         #     # short for 'dirty', we want to keep our verstrings source for protobuf reasons
         #     suffix = sha + "-d"
-        verObj["long"] = "{}.{}.{}.{}".format(
-            version["major"], version["minor"], version["build"], suffix
-        )
+        verObj["long"] = "{}.{}".format(verObj["short"], suffix)
+        verObj["deb"] = "{}.{}~{}{}".format(verObj["short"], run_number, build_location, sha)
     except:
         # print("Unexpected error:", sys.exc_info()[0])
         # traceback.print_exc()
         verObj["long"] = verObj["short"]
+        verObj["deb"] = "{}.{}~{}".format(verObj["short"], run_number, build_location)
 
     # print("firmware version " + verStr)
     return verObj

@@ -1,62 +1,109 @@
-name: Package Launchpad PPA
+name: Package for Launchpad PPA
 
 on:
   workflow_call:
     secrets:
       PPA_GPG_PRIVATE_KEY:
         required: true
-  workflow_dispatch:
+      PPA_SFTP_PRIVATE_KEY:
+        required: true
+    inputs:
+      ppa_repo:
+        description: Meshtastic PPA to target
+        required: true
+        type: string
+      series:
+        description: Ubuntu series to target
+        required: true
+        type: string
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
   build-debian-src:
     uses: ./.github/workflows/build_debian_src.yml
     secrets: inherit
+    with:
+      series: ${{ inputs.series }}
+      build_location: ppa
 
   package-ppa:
+    if: ${{ github.event_name != 'pull_request_target' && github.event_name != 'pull_request' }}
     runs-on: ubuntu-24.04
     needs: build-debian-src
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
-          ref: ${{github.event.pull_request.head.ref}}
-          repository: ${{github.event.pull_request.head.repo.full_name}}
+          path: meshtasticd
+
+      - name: Install deps
+        shell: bash
+        run: |
+          sudo apt-get update -y --fix-missing
+          sudo apt-get install -y dput openssh-client
+
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.PPA_GPG_PRIVATE_KEY }}
+        id: gpg
 
       - name: Get release version string
+        working-directory: meshtasticd
         run: |
-          echo "long=$(./bin/buildinfo.py long)" >> $GITHUB_OUTPUT
-          echo "short=$(./bin/buildinfo.py short)" >> $GITHUB_OUTPUT
+          echo "deb=$(./bin/buildinfo.py deb)" >> $GITHUB_OUTPUT
+        env:
+          BUILD_LOCATION: ppa
         id: version
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
-          name: firmware-debian-${{ steps.version.outputs.long }}-src.zip
+          name: firmware-debian-${{ steps.version.outputs.deb }}~${{ inputs.series }}-src
           merge-multiple: true
 
-      # - name: Install deps
-      #   shell: bash
-      #   run: |
-      #     sudo apt-get update -y --fix-missing
-      #     sudo apt-get install -y dput
-
       - name: Display structure of downloaded files
-        run: ls -R
+        run: ls -lah
 
-      - name: Publish PPA
-        if: ${{ github.event_name != 'pull_request_target' && github.event_name != 'pull_request' }}
-        uses: yuezk/publish-ppa-package@v2
+      - name: Trust Launchpad's SSH key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ppa.launchpad.net >> ~/.ssh/known_hosts
+
+      - name: Setup dput config
+        env:
+          ppa_login: meshtasticorg
+        run: |
+          sudo tee /etc/meshtastic-dput.cf >/dev/null <<EOF
+          [ppa]
+          fqdn                    = ppa.launchpad.net
+          method                  = ftp
+          incoming                = ~%(ppa)s
+          login                   = anonymous
+
+          [ssh-ppa]
+          fqdn                    = ppa.launchpad.net
+          method                  = sftp
+          incoming                = ~%(ssh-ppa)s
+          login                   = ${ppa_login}
+          EOF
+
+      - name: Import SSH key
+        uses: webfactory/ssh-agent@v0.10.0
         with:
-            # See https://launchpad.net/~meshtastic/+archive/ubuntu/meshtastic-daily
-            repository: "meshtastic/meshtastic-daily"
-            gpg_private_key: ${{ secrets.PPA_GPG_PRIVATE_KEY }}
-            tarball: "meshtasticd_${{ steps.version.outputs.short }}.tar.xz"
-            # Supported Ubuntu versions
-            series: "plucky oracular noble jammy"
-            deb_email: "github-actions[bot]@users.noreply.github.com"
-            deb_fullname: "github-actions[bot]"
+          ssh-private-key: ${{ secrets.PPA_SFTP_PRIVATE_KEY }}
+        id: ssh
+
+      - name: Publish with dput (sftp)
+        timeout-minutes: 30 # dput is terrible, sometimes runs 'forever'
+        env:
+          up_ppa_repo: ${{ inputs.ppa_repo }}
+          up_series: ${{ inputs.series }}
+          up_version: ${{ steps.version.outputs.deb }}
+        run: >
+          dput -c /etc/meshtastic-dput.cf
+          ssh-${up_ppa_repo}
+          meshtasticd_${up_version}~${up_series}_source.changes

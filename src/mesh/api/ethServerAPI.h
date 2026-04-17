@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ServerAPI.h"
+#ifndef USE_WS5500
 #include <RAK13800_W5100S.h>
 
 /**
@@ -23,3 +24,5 @@ class ethServerPort : public APIServerPort<ethServerAPI, EthernetServer>
 };
 
 void initApiServer(int port = SERVER_API_DEFAULT_PORT);
+void deInitApiServer();
+#endif
