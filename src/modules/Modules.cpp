@@ -175,10 +175,10 @@ void setupModules()
     keyVerificationModule = new KeyVerificationModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_LEDMATRIX
-new LedMatrixModule();
+    new LedMatrixModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_KEYPAD
-new KeypadModule(); 
+    new KeypadModule();
 #endif
 
 #if !MESHTASTIC_EXCLUDE_DROPZONE

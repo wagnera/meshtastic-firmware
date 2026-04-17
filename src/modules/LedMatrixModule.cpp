@@ -73,19 +73,31 @@ tm unixTimeToCT(long long unixTime) {
     int ctOffsetStandard = -6; // Central Standard Time (CST) UTC offset
     int ctOffsetDST = -5;      // Central Daylight Time (CDT) UTC offset
 
-    // Hard-coded DST transition times for the next 10 years (assuming DST starts on March 14 and ends on November 7)
+    // Hard-coded DST transition times (2nd Sunday of March → 1st Sunday of November, US rules).
+    // All timestamps are 08:00 UTC (= 2:00 AM CST, the moment clocks change).
     int dstTransitions[] = {
-        1678608000, // March 12, 2023 - DST starts
-        1699171200, // November 5, 2023 - DST ends
-        1710057600, // March 10, 2024 - DST starts
-        1730620800, // November 3, 2024 - DST ends
-        1741507200, // March 9, 2025 - DST starts
-        1762070400, // November 2, 2025 - DST ends
         1772956800, // March 8, 2026 - DST starts
         1793520000, // November 1, 2026 - DST ends
         1805011200, // March 14, 2027 - DST starts
         1825574400, // November 7, 2027 - DST ends
-        // Add more years if needed
+        1836460800, // March 12, 2028 - DST starts
+        1857024000, // November 5, 2028 - DST ends
+        1867910400, // March 11, 2029 - DST starts
+        1888473600, // November 4, 2029 - DST ends
+        1899360000, // March 10, 2030 - DST starts
+        1919923200, // November 3, 2030 - DST ends
+        1930809600, // March 9, 2031 - DST starts
+        1951372800, // November 2, 2031 - DST ends
+        1962864000, // March 14, 2032 - DST starts
+        1983427200, // November 7, 2032 - DST ends
+        1994313600, // March 13, 2033 - DST starts
+        2014876800, // November 6, 2033 - DST ends
+        2025763200, // March 12, 2034 - DST starts
+        2046326400, // November 5, 2034 - DST ends
+        2057212800, // March 11, 2035 - DST starts
+        2077776000, // November 4, 2035 - DST ends
+        2088662400, // March 9, 2036 - DST starts
+        2109225600, // November 2, 2036 - DST ends
     };
 
     // Determine whether DST is in effect at the given Unix time
